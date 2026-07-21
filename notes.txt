@@ -1,0 +1,17 @@
+mysql -u root -p // sql shell
+
+show <tables/databases>; // shows podaksdopkadk
+
+create database/table <name>; // create oaskdopasdad
+
+use <database-name>;
+
+insert into <table-name>(field1, field2, field3) values(value1a, value2a, value3a),(value1b, value2b, value3b);
+
+alter table <table-name> change <old-colname> <new-colname>;
+
+update <table-name> set <col>=`value` <where-clause> // where id=1; 
+
+
+
+
