@@ -1,0 +1,23 @@
+Guys practice the ff. for the preparation of your Practical:
+1. How to open Xampp
+    open xampp control panel -> start mysql module -> xampp shell -> `mysql -u root -p`
+
+2. Show Database
+    `show databases;`
+
+3. Create Database
+    `create database <database-name>`
+4. Create Table & fieldnames
+    `create table <table_name>(fieldname1 int(11) not null auto_increment primary key, fieldname2 name varchar(50) not null, fieldname3 int(3) not null);`
+
+5. Adding of records in the table
+    insert into <table_name>(fieldname2, fieldname3) values(value2a, value 2b),(value 3a, value 3b);
+
+6. Inserting Fieldnames of the Table
+    alter table <table_name> add <column_name> constraints FIRST/after <fieldname>
+
+7. Changing Fieldnames of the Table
+    alter table rename 
+8. Updating Records of the Table
+
+yan po ah, GOOD LUCK

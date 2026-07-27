@@ -13,5 +13,18 @@ alter table <table-name> change <old-colname> <new-colname>;
 update <table-name> set <col>=`value` <where-clause> // where id=1; 
 
 
+open xampp
+create database 
+show databases
 
+create table 
+show tables 
+
+adding records 
+
+updating records 
+
+updating field names 
+
+showing records
 
