@@ -3,7 +3,7 @@ $activePage = $activePage ?? '';
 
 $navItems = [
     ["key" => "dashboard", "label" => "Dashboard",         "href" => "/dashboard.php"],
-    ["key" => "update",    "label" => "Update Balance",    "href" => "/update-balance.php"],
+    ["key" => "update",    "label" => "Make Transaction", "href" => "/make-transactions.php"],
     ["key" => "history",   "label" => "Transaction History", "href" => "/history.php"],
     ["key" => "summary",   "label" => "Summary",           "href" => "/summary.php"],
     ["key" => "goals",     "label" => "Goals",             "href" => "/goals.php"],

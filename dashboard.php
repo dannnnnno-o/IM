@@ -62,7 +62,7 @@ require_once("./partials/sidebar.php");
                 <div class="balance-amount"><?= peso($user["balance"]) ?></div>
             </div>
         </div>
-        <a class="btn btn-primary balance-cta" href="/update-balance.php">Make Transaction</a>
+        <a class="btn btn-primary balance-cta" href="/make-transactions.php">Make Transaction</a>
     </section>
 
     <div class="row g-3 mb-4">

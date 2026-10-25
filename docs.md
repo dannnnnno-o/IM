@@ -5,12 +5,13 @@ Information Management project. Submitted by **Daniel Z. Baladad**.
 
 Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
-> Last updated: **24 Oct 2026**
-> Status: **Every feature from the proposal is live**: Dashboard, Update
-> Balance, History (period picker + type filter), Summary (donut + category
-> breakdown), Categories endpoint, and **Goals** (list + details + invest /
-> take back / edit / delete). See §14 for what remains deferred and §0 for
-> session history.
+> Last updated: **26 Oct 2026**
+> Status: **Every feature from the proposal is live**: Dashboard, "Make
+> Transaction" (`/make-transactions.php`, renamed 26 Oct), History
+> (period picker + type filter), Summary (donut + category breakdown),
+> Categories endpoint, and **Goals** (list + details + invest / take back /
+> edit / delete). See §14 for what remains deferred and §0 for session
+> history.
 
 ---
 
@@ -68,14 +69,26 @@ For the agent picking this up: three sprints shipped today. The list of
   the QA cleanup order for goals (§11) and the delete-keeps-transactions
   semantics (§6c).
 
+### Sprint 5 — polish pass (26 Oct 2026)
+- The Update Balance page was **renamed to "Make Transaction"** in the
+  sidebar tab, page heading and browser title, and on 26 Oct the route file
+  itself became **`/make-transactions.php`** (git mv, all references
+  updated). Grep before assuming "Update Balance" wording is a bug.
+- The mode select's green/red tint (`mode-income` / `mode-expense` CSS +
+  paint JS) was REMOVED by user decision: every dropdown on the site is now
+  the same neutral dark style. `CSS_VERSION` bumped to `20261026-1`.
+
 ### Current state at session end
-- DB: `transactions` 13 rows, `users` balance 199939, **balance drift 0**;
-  `goals` 4 rows (Sample Goal 4 shows the Completed path: 300/300),
-  `goal_investments` 0 rows, `PREDEFINED_CATEGORIES` now includes
-  `Goal Investment`; 12-ish custom categories live in `users.categories`
-  (including the 8 that are really migrated labels, e.g. "Sample Transaction
-  #22", "Instant Coffee"). The human was re-categorizing rows during testing —
-  data composition may differ from what you saw; that is expected.
+- DB baseline as of 26 Oct 2026: `transactions` 14 rows, `users` balance
+  199739, **balance drift 0** (the human re-categorized and edited rows over
+  the weekend — earlier snapshots said 13 rows / 199939; whatever you see,
+  trust the drift query, not historical numbers). `goals` 4 rows (Sample
+  Goal 4 shows the Completed path: 300/300), `goal_investments` 0 rows,
+  `PREDEFINED_CATEGORIES` now includes `Goal Investment`; a handful of
+  custom categories live in `users.categories` (Grocery, Lottery, Travel,
+  Dinner + the 8 migrated labels like "Sample Transaction #22", "Instant
+  Coffee"). Live edits like this are expected — snapshot the baseline
+  before QA cycles and restore exactly after.
 - Verified working: routes 200/302, donut math visually confirmed (1–3
   slices), picker validation (errors for non-list dates/weeks/months +
   future periods), History pagination carrying `view`/`week`/`month`/`year`/
@@ -150,7 +163,8 @@ cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js vendor/bootstrap/
 /opt/lampp/htdocs/
 ├── index.php            → 302 redirect to dashboard.php
 ├── dashboard.php        route: dashboard
-├── update-balance.php   route: transaction entry form (+ Add Category modal)
+├── make-transactions.php route: "Make Transaction" entry form (+ Add Category
+│                         modal) — renamed from update-balance.php 26 Oct 2026
 ├── history.php          route: filterable, paginated history
 ├── summary.php          route: expense donut + category breakdown
 ├── categories.php       JSON endpoint: POST-only, saves a custom category
@@ -252,7 +266,10 @@ inherits the theme without hand-styling.
 
 **Colour rules that are now load-bearing — do not break them:**
 - **Green = Income only.** Red = Expense only. Never green for "this number is
-  small", never red for a neutral action.
+  small", never red for a neutral action. (The mode select once carried a
+  green/red tint for the chosen side — removed 26 Oct 2026 by user decision;
+  all form dropdowns are now the shared neutral style. Green/red still appear
+  only on income/expense DATA via `.stat-income` / `.stat-expense`.)
 - Balance uses the teal `--balance-accent`, which is a *different* green from
   `--income`. Intentional; reads as the same family.
 - `.btn-outline-danger` (red) is reserved for destructive actions, so red never
@@ -277,7 +294,7 @@ originals failed AA as text.
 |---|---|---|
 | `/` | done | 302 → dashboard |
 | `/dashboard.php` | done | balance card, week/month expense cards, goal count, recent 5 |
-| `/update-balance.php` | done | POST form, redirects to dashboard on success; category picker + Add Category modal |
+| `/make-transactions.php` | done | "Make Transaction" (renamed 26 Oct 2026, ex update-balance.php). POST form → dashboard redirect; category picker + Add Category modal |
 | `/history.php` | done | shared period picker (All Time default + Daily/Week/Month), type filter, pagination, expandable comments |
 | `/summary.php` | done | Daily/Weekly/Monthly toggle, date picker, donut + breakdown table |
 | `/categories.php` | done | JSON endpoint. POST `name=` → 201/400; GET → **405** |
@@ -323,7 +340,7 @@ truth:
   distinct labels seeded as custom categories via the endpoint, then rows
   copied before `description` was dropped. Backup at
   `/tmp/opencode/jbudget-backup-pre-category-migration.sql`.
-- The "Add Category" modal in update-balance posts via `fetch()` with
+- The "Add Category" modal in make-transactions.php posts via `fetch()` with
   **FormData** (form-urlencoded) — deliberately chosen so the endpoint is
   trivially curl-testable and the client contract ("read list on load,
   add on demand") maps 1:1 onto the future localStorage migration.
@@ -350,7 +367,7 @@ User decisions locked 24 Oct 2026:
   Goal 4, 300/300) still honour the cap because the cap reads the aggregate.
 - **`create_transaction()` was refactored**: `insert_transaction()` is the
   shared core (needs an open PDO transaction, returns the new txn id);
-  `create_transaction()` wraps it for update-balance.php (now returns txn id,
+  `create_transaction()` wraps it for make-transactions.php (now returns txn id,
   optional `goal` param). The goal flows bundle txn + balance + ledger +
   aggregate in ONE transaction — four writes that partially fail together,
   never partially.
@@ -399,7 +416,7 @@ the transaction block was bypassed (e.g. a manual `UPDATE users`).
 
 ## 8. Validation rules
 
-### Update Balance
+### Make Transaction (was "Update Balance")
 | Field | Rule | Message |
 |---|---|---|
 | mode | `income` \| `expense` | "Choose a valid transaction mode." |
@@ -492,7 +509,7 @@ rejected rather than silently rolling into March.
 | any goal-save error | the shared goal modal auto-reopens server-rendered with the failed values |
 | any invest/take-back error | the respective modal auto-reopens with the failed amount |
 
-> Amount rules deliberately mirror update-balance (ctype_digit, > 0, ≤
+> Amount rules deliberately mirror make-transactions (ctype_digit, > 0, ≤
 > 2147483647, ≤ 10 chars) — same error strings family, no negative or float
 > amounts anywhere.
 
@@ -672,8 +689,9 @@ adding before submission.
 
 Goals shipped 24 Oct 2026 (see §6c for the locked design, §4 for the schema,
 §8 for the validation table). With it, **every route in the proposal is
-live**: Dashboard, Update Balance, History, Summary, Categories endpoint,
-Goals list + detail. The wireframe's remaining screens (5–7) are now built.
+live**: Dashboard, Make Transaction (ex Update Balance), History, Summary,
+Categories endpoint, Goals list + detail. The wireframe's remaining screens
+(5–7) are now built.
 
 ### Deferred (deliberate, not bugs)
 - Category rename/delete UI (add-only so far; removal is safe because stored
@@ -697,7 +715,7 @@ for f in *.php partials/*.php; do php -l "$f"; done
 
 # routes (expect 200 everywhere except "/" = 302, categories GET = 405,
 # and goal-details without an id = 302 to /goals.php)
-for r in / /dashboard.php /update-balance.php /history.php "/history.php?view=weekly" \
+for r in / /dashboard.php /make-transactions.php /history.php "/history.php?view=weekly" \
          "/history.php?type=expense&view=monthly" /summary.php \
          "/summary.php?view=weekly" "/summary.php?view=monthly" "/summary.php?view=bogus" \
          /goals.php "/goal-details.php?id=4" "/goal-details.php?id=999999"; do

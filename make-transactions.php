@@ -12,7 +12,7 @@ $userId = (int) $user["id"];
 
 $categories = all_categories($pdo, $userId);
 
-$pageTitle = "Update Balance";
+$pageTitle = "Make Transaction";
 $activePage = "update";
 
 $errors = [];
@@ -75,7 +75,7 @@ require_once("./partials/sidebar.php");
 <main class="app-main">
     <header class="page-header is-centered">
         <div>
-            <h1 class="h4 mb-1">Update Balance</h1>
+            <h1 class="h4 mb-1">Make Transaction</h1>
             <p class="text-muted mb-0">Log an income or expense against your balance.</p>
         </div>
     </header>
@@ -93,7 +93,7 @@ require_once("./partials/sidebar.php");
                         </div>
                     <?php endif; ?>
 
-                    <form method="post" action="/update-balance.php" novalidate>
+                    <form method="post" action="/make-transactions.php" novalidate>
                         <div class="mb-3">
                             <label class="form-label" for="mode">Transaction Mode</label>
                             <select class="form-select" id="mode" name="mode">
@@ -107,13 +107,14 @@ require_once("./partials/sidebar.php");
                             <input type="text" inputmode="numeric" class="form-control"
                                    id="amount" name="amount"
                                    placeholder="Enter amount (integer only)"
-                                   value="<?= htmlspecialchars($form["amount"]) ?>">
+                                   value="<?= htmlspecialchars($form["amount"]) ?>"
+                                   autocomplete="off">
                         </div>
 
                         <div class="mb-3">
                             <div class="d-flex align-items-center justify-content-between">
                                 <label class="form-label" for="category">Category</label>
-                                <button type="button" class="btn-add-category" data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add</button>
+                                <button type="button" class="btn-add-category" data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add Category</button>
                             </div>
                             <select class="form-select" id="category" name="category" required>
                                 <option value="" disabled <?= $form["category"] === "" ? "selected" : "" ?>>Choose a category&hellip;</option>
@@ -128,13 +129,13 @@ require_once("./partials/sidebar.php");
 
                         <div class="mb-4">
                             <label class="form-label" for="comment">Comment (Optional)</label>
-                            <textarea class="form-control" rows="3" maxlength="500"
+                            <textarea class="form-control" style="resize: none;" rows="5" maxlength="500"
                                       id="comment" name="comment"
                                       placeholder="Add more detail about this transaction."><?= htmlspecialchars($form["comment"]) ?></textarea>
                             <div class="form-text"><span id="commentCount">0</span>/500 characters</div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100">Submit</button>
+                        <button type="submit" class="btn btn-primary w-100">Confirm Transaction</button>
                     </form>
 
                 </div>
@@ -171,18 +172,6 @@ require_once("./partials/sidebar.php");
 
 <script>
 (function(){
-    var select = document.getElementById("mode");
-    if(select){
-        function paint(){
-            var income = select.value === "income";
-            select.classList.toggle("mode-income", income);
-            select.classList.toggle("mode-expense", !income);
-        }
-
-        select.addEventListener("change", paint);
-        paint();
-    }
-
     var box = document.getElementById("comment");
     var count = document.getElementById("commentCount");
     if(box && count){

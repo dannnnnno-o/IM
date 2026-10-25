@@ -100,18 +100,6 @@ a:hover {
   opacity: 1;
 }
 
-.form-select.mode-income {
-  border-color: var(--income);
-  color: var(--income);
-  background-color: rgba(6, 187, 134, 0.12);
-}
-
-.form-select.mode-expense {
-  border-color: var(--expense);
-  color: var(--expense);
-  background-color: rgba(255, 107, 127, 0.12);
-}
-
 .table {
   --bs-table-bg: transparent;
   --bs-table-color: var(--text);

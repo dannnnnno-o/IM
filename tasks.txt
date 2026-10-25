@@ -32,3 +32,29 @@ Target Routes To Be Done
 
 
 | 10 - 27 - 2026 | Target Completion: 100%
+
+
+
+10 - 26 - 2026
+
+adjustments
+
+1. Update Balance Tab -> Make Transaction Tab
+2. Clear out data
+3. Adjust UX for Goals
+4. Dedicated Goal Historys
+5. Remove option "others" on update balance tab (soon-to-be Make Transaction Tab)
+6. Adjust Update Balance's Transaction Mode's dropdown style to match the global style
+7. Adjust Update Balance's Category "+ Add" button to "+ Add Custom Category" -> Done
+8. Adjust Update Balance's Category "Submit" button to "Submit Transaction" -> Done
+9. Check Dashboard's welcome message's date (currently 12:40 am, it's showing the date yesterday)
+10. Dedicated Goal History? Ledger? not udating
+
+
+Update Balance
+1. From "Update Balance" to "Make Transaction"
+2. match the transaction mode's dropdown style for consistency
+3. "+ Add" to "+ Add Category" 
+4. "Submit" to "Confirm Transaction"
+5. Autocomplete off for amount input
+ 
