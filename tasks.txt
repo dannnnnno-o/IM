@@ -1,0 +1,34 @@
+| 10 - 20 - 2026 | Target Completion: ~50%
+
+Define Color Scheme
+
+help me out here bnuuy, am not sure if the color scheme on wireframe.png is good enough or not.
+
+Define Tech Stack
+    Front-end
+        HTML 
+        Bootstrap 5
+        JS
+    Back-end
+        Vanilla PHP
+    Database
+        MySQL
+
+
+Target Routes To Be Done
+    1. Landing Page
+        Username Prompt
+    2. Dashboard
+        I. Current Balance -> Make Transaction=>Update Balance
+        II. (Summary): This week -> This month -> Total Goals
+        III. Recent Transactions -> View All=>History
+    3. Update Balance
+        I. Transaction Mode == Income||Expense
+        II. Amount = integer
+        III. Description = e.g.: Salary, groceries, etc.
+        IV. Submit button
+    4.History
+        
+
+
+| 10 - 27 - 2026 | Target Completion: 100%
