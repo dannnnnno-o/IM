@@ -78,6 +78,20 @@ For the agent picking this up: three sprints shipped today. The list of
   paint JS) was REMOVED by user decision: every dropdown on the site is now
   the same neutral dark style. `CSS_VERSION` bumped to `20261026-1`.
 
+### Sprint 6 — Goals 2.0 + History Goal tab (26 Oct 2026)
+- tasks.txt + `goal-components/` mockups (goal-cards, flow, modal-prompts,
+  UI) drove a full goals revision: `goal-details.php` REMOVED (all actions on
+  the `/goals.php` card state machine), explicit completion via Confirm
+  modal (`completed` int + `date_completed` DATE, sticky), delete blocked
+  while money is invested (hard stop + hover hint), edit undercut rule,
+  On-going/Completed section split on the list.
+- History Type filter gained the "Goal" tab (`type=goal` → `goal = 1`,
+  mode-unrestricted); comment rows render auto-expanded in the Goal tab
+  because goal=1 can't name the goal — comments carry attribution
+  ("Invested in <name>"). Per-goal ledger UI removed.
+- QA'd end-to-end through real POSTs (state machine matrix, blocked delete,
+  complete flow with date, History Goal tab) and fully restored (drift 0).
+
 ### Current state at session end
 - DB baseline as of 26 Oct 2026: `transactions` 14 rows, `users` balance
   199739, **balance drift 0** (the human re-categorized and edited rows over
@@ -169,7 +183,8 @@ cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js vendor/bootstrap/
 ├── summary.php          route: expense donut + category breakdown
 ├── categories.php       JSON endpoint: POST-only, saves a custom category
 ├── goals.php            route: goal list (progress cards, Set/Edit modal)
-├── goal-details.php     route: goal detail (progress, ledger, invest/take-back)
+├── goals.php            route: goal list + ALL goal actions on the cards
+│                         (invest/take-back/edit/delete/complete; no detail page)
 ├── db.php               PDO connection
 ├── model.php            all queries + formatting helpers
 ├── partials/
@@ -179,7 +194,7 @@ cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js vendor/bootstrap/
 │   ├── period-picker.php shared Daily/Week/Month (+All Time) picker used by
 │   │                     summary.php and history.php (consumes resolve_period())
 │   └── goal-modals.php  shared Set/Edit Goal + Delete Goal modals used by
-│                         goals.php and goal-details.php
+│                         goals.php
 ├── styles/global.css    ALL custom styling + design tokens
 ├── vendor/bootstrap/    the only web-served Bootstrap files
 └── node_modules/        npm working dir (403-locked)
@@ -220,13 +235,16 @@ breaks real browsers: the Summary donut once "vanished" this way because the
 | `id`, `balance`, `username` | | `pin` column was removed; table is effectively a single-row config |
 | `categories` | varchar(2500) NULL | **JSON array** of custom category names. Read/written ONLY by `get_custom_categories()` / `save_custom_category()` in `model.php`. Currently a stop-gap until categories move to browser localStorage — keep access confined to those two functions so the swap stays contained. |
 
-### `goals` (activated 24 Oct 2026)
-`id, name, target_amount, target_date (varchar), investment`
+### `goals` (activated 24 Oct 2026; revised 26 Oct 2026)
+`id, name, target_amount, target_date (varchar), investment, completed (int, 0/1, default 0), date_completed (DATE NULL)`
 
 > `target_date` is `varchar` holding junk values (`"Bukas"`, `"November 5, 2026"`).
 > The proposal allows this — "No Date Validation for Goals" is a stated
 > limitation. `goals.investment` is a **maintained aggregate** (net invested,
 > updated by `record_goal_investment()` in the same write as the ledger).
+> `completed` is set ONLY by the Confirm Completion flow — reaching 100%
+> invested does not complete a goal; `date_completed` records the day of
+> `mark_goal_complete()`.
 
 ### `goal_investments` (added 24 Oct 2026)
 `id, goal_id (int), transaction_id (int), amount (int SIGNED), created_at (DATETIME default CURRENT_TIMESTAMP)`
@@ -298,8 +316,7 @@ originals failed AA as text.
 | `/history.php` | done | shared period picker (All Time default + Daily/Week/Month), type filter, pagination, expandable comments |
 | `/summary.php` | done | Daily/Weekly/Monthly toggle, date picker, donut + breakdown table |
 | `/categories.php` | done | JSON endpoint. POST `name=` → 201/400; GET → **405** |
-| `/goals.php` | done | goal list: progress cards, Completed/Ongoing badges, Set/Edit modal, Delete confirm |
-| `/goal-details.php?id=N` | done | goal detail: progress card, investment ledger, Invest/Take Back (modals), Edit, Delete; no id → 302 list; unknown id → not-found card |
+| `/goals.php` | done | goal list (On-going/Completed sections) + ALL actions on cards: invest, take back, complete (confirm modal), edit, delete (blocked while invested) |
 
 **No Landing Page.** Single-account context plus a populated `users` table means
 the name prompt is unnecessary; `index.php` redirects to the dashboard instead.
@@ -347,9 +364,11 @@ truth:
 
 ---
 
-## 6c. Goals design (added 24 Oct 2026)
+## 6c. Goals design (added 24 Oct 2026; revised 26 Oct 2026)
 
-User decisions locked 24 Oct 2026:
+User decisions locked 24 Oct 2026 and revised the same build cycle with the
+tasks.txt + `goal-components/` mockups (26 Oct):
+
 - **Investing writes a REAL transaction** (not ledger-only): mode `-` on
   invest, `+` on take back, `goal = 1` (the existing boolean-ish int column:
   0 = not goal-related), category = fixed predefined **`Goal Investment`**
@@ -359,32 +378,79 @@ User decisions locked 24 Oct 2026:
   appear in History and the Summary breakdown under that category.
 - **Take back is partial** up to the goal's net invested amount; the cap is
   validated server-side ("You can take back at most ₱…").
-- Per-goal attribution comes from the `goal_investments` ledger (signed
-  rows) because `transactions.goal` is just 0/1 — see §4.
-- `goals.investment` stays as a maintained aggregate, updated in the same
-  atomic write as transaction + ledger row (`record_goal_investment()`).
-  Pre-existing rows with `investment > 0` and empty ledger (e.g. Sample
-  Goal 4, 300/300) still honour the cap because the cap reads the aggregate.
+- Per-goal attribution comes from the signed `goal_investments` ledger rows
+  because `transactions.goal` is just 0/1 — §4. **Since 26 Oct the ledger is
+  write-only infrastructure: its UI was removed** and attribution is read
+  from the transaction comment in History's Goal tab (see §8). Keep writing
+  it — it is free inside the atomic invest flow.
 - **`create_transaction()` was refactored**: `insert_transaction()` is the
   shared core (needs an open PDO transaction, returns the new txn id);
   `create_transaction()` wraps it for make-transactions.php (now returns txn id,
   optional `goal` param). The goal flows bundle txn + balance + ledger +
   aggregate in ONE transaction — four writes that partially fail together,
   never partially.
-- **Delete goal**: allowed regardless of invested money. Ledger rows go with
-  the goal (app-level, inside delete_goal's transaction — no FK by design);
-  the recorded transactions and their balance effects STAY (history is
-  history).
-- Auto-complete is derived: `investment >= target_amount` → teal
-  "Completed" badge (+ teal progress bar fill); otherwise neutral "Ongoing"
-  badge. No status column.
+- **`goals.investment` stays as a maintained aggregate**, updated in the same
+  atomic write; the take-back cap and every completed-check read it.
+- **Explicit completion (26 Oct — supersedes the earlier auto-derive):**
+  reaching `investment >= target_amount` does NOT complete a goal by itself.
+  A "Complete" button appears on the card at exactly 100% and a Confirm
+  Completion modal ("Are you sure you want to mark <name> as complete?")
+  writes `completed = 1` and `date_completed = CURDATE()` via
+  `mark_goal_complete()`. Completion is sticky: no un-complete exists, and a
+  completed goal is frozen (invest/take-back blocked, complete button gone;
+  Edit/allowed tidy-ups excluded). The badge is keyed on `completed` only.
+- **Card state machine** (all on the card now — `goal-details.php` was
+  REMOVED 26 Oct and every action posts to `/goals.php`):
+  | Invested | Invest | Take Back | Complete |
+  |---|---|---|---|
+  | ₱0 | ✓ | disabled ("Nothing has been invested yet." hover hint) | not shown |
+  | X < target | ✓ | ✓ | not shown |
+  | 100% | disabled ("Target reached…") | ✓ | shown → confirm modal |
+  | completed | disabled | disabled | gone |
+```
+  (26 Oct revision: Edit is **also disabled** on a completed card and
+  `goal_save` hard-stops it server-side — "That goal is already completed." —
+  so a completed goal's target/name cannot be adjusted at all.)
+- **Delete is blocked while investment > 0** (flow.png "Still has
+  investments"): card button disabled with a wrapper-span **Bootstrap
+  tooltip** (26 Oct: upgraded from a native `title` attr — `data-bs-toggle=
+  "tooltip"` + `data-bs-placement="top"` on the wrapper `<span>` that hosts
+  the disabled button, initialized with `bootstrap.Tooltip.getOrCreateInstance`
+  inside a DOMContentLoaded listener because the bundle loads after page
+  scripts; verified showing on hover and hiding on mouse-out via CDP. The
+  wrapper-span pattern is required because disabled buttons never fire hover
+  events themselves). Wording is per-cause (26 Oct revision): an **ongoing**
+  card with money inside says "This goal still has investments. Take the
+  funds back first." (same as the server error), while a **completed** card
+  says "This goal is already completed." for every locked button including
+  Delete — its server stop is "That goal is already completed." too.
+  ("Sensible-message" request 26 Oct; the real unblocker for completed goals
+  would be a delete-archive feature — deferred, see §14.) The card button
+  label is "Take Investment" (user-relabelled 26 Oct; the server action
+  name stays `takeback`). The POST
+  also hard-stops ("This goal still has investments. Take the funds back
+  first."). Completed goals with funds inside are therefore intentionally
+  undeletable via the app — the completion freeze and the delete block meet
+  head-on by design; SQL is the only escape hatch.
+- **Edit undercut rule** (flow.png `Edit_Investment` catch): goal_save for an
+  existing goal rejects `target_amount < investment`
+  ("Target amount cannot be lower than the invested amount.").
+- **History "Goal" tab (26 Oct)**: the Type filter gained a 4th option
+  `goal` → `WHERE goal = 1` (mode-unrestricted), comment rows auto-expand
+  there so "Invested in <name>" attribution is visible without clicks
+  (`goal` can't name the goal because it is a boolean). Ledger UI removed
+  per goal as a consequence (task "remove the goal-ledgers on each goals").
 - `target_date` stays free-text by design ("No Date Validation for Goals" is
   a stated proposal limitation); `peso()`, integer amounts everywhere.
-- UI colours follow the house rules: progress bar = `--brand` (or teal when
-  complete), badges neutral/teal, Delete is the only `.btn-outline-danger`.
-  Shared modals live in `partials/goal-modals.php` (single copy consumed by
-  both routes); failed POSTs re-open the offending modal via a
-  DOMContentLoaded listener (the Bootstrap bundle loads after page scripts).
+  Completed cards show "Date Completed" above "Target Date".
+- UI colours follow the house rules (mockup greens interpreted as wireframe
+  sketches, not literal styles — user confirmed): progress bar `--brand`
+  while under target, `--balance-accent` teal when full/completed, badges
+  neutral/teal, Complete and Invest buttons `btn-primary`, Delete the only
+  `.btn-outline-danger`. All modals (edit/delete shared partial + invest/
+  take-back/complete inline) post to `/goals.php` with `goal_id`; failed
+  POSTs re-open the offending modal via a DOMContentLoaded listener (the
+  Bootstrap bundle loads after page scripts).
 
 ---
 
@@ -439,7 +505,8 @@ The JS counter uses `Array.from(value).length` to match exactly.
 ### History filters
 | Case | Behaviour |
 |---|---|
-| `type` not in `all/income/expense` | silently normalised to `all` |
+| `type` not in `all/income/expense/goal` | silently normalised to `all` |
+| `type=goal` (added 26 Oct) | `WHERE goal = 1`, mode-unrestricted (invest + take back both); count label reads "N goal record(s) found"; comment rows render **auto-expanded** so the "Invested in <name>" comment carries the attribution |
 | period params (`view`, `date`, `week`, `month`, `year`) | same rules as Summary (see table below). All Time is the **default view** and shows every transaction; picking a day, week or month bounds the list |
 | any filter error | query is **skipped entirely**, no DB call |
 
@@ -493,20 +560,30 @@ rejected rather than silently rolling into March.
 > it returned results for the *opposite* range while the inputs still displayed
 > the originals. Never silently reinterpret user input; show the error.
 
-### Goals (added 24 Oct 2026)
+### Goals (revised 26 Oct 2026 — single route `/goals.php`)
 | Case | Behaviour |
 |---|---|
 | `name` blank | error: `Name is required.` (modal re-opens with state) |
 | `name` > 255 chars | error: `Name must be 255 characters or fewer.` |
 | `target_amount` blank / not a positive integer / too large | errors: `Target amount is required.` / `Target amount must be a whole positive number.` / `Target amount is too large.` (same integer rules as transaction amounts) |
 | `target_date` | **no validation** (stated proposal limitation) — free text, ≤ 255 chars, may be blank |
+| edit: `target_amount` < `investment` | error: `Target amount cannot be lower than the invested amount.` (flow.png Edit_Investment catch) |
+| edit on a completed goal | **blocked** (Edit button disabled + hover hint): `That goal is already completed.` — target/name are frozen after completion |
 | `invest` amount invalid | errors: `Amount is required.` / `Amount must be a whole positive number.` / `Amount is too large.` |
+| `invest` on a 100% goal | blocked (button disabled + server stop): `The goal has reached its target amount. Mark it complete or take funds back.` |
+| `invest`/`takeback` on a completed goal | blocked: `That goal is already completed.` |
 | `takeback` amount > net invested | error: `You can take back at most ₱….`, query skipped |
-| unknown goal id (POST) | error: `That goal no longer exists.` — renders the not-found card, no partial writes |
+| `takeback` with ₱0 invested | blocked on the card (button disabled, hover hint); server cap equation also rejects |
+| `complete` below 100% | blocked (button not shown): `The goal has not reached its target amount yet.` |
+| `complete` at 100% | confirm modal → `mark_goal_complete()`: `completed=1`, `date_completed=CURDATE()` → flash "Marked as complete." |
+| `complete` on already-completed | error: `That goal is already completed.` |
+| `goal_delete` with investment > 0 (ongoing) | **hard blocked** (disabled button + wrapper-span Bootstrap tooltip "This goal still has investments. Take the funds back first."); server error names the same reason |
+| `goal_delete` on a completed goal | **hard blocked regardless of funds** (disabled button; tooltip "This goal is already completed." matching the card's other locked buttons); server error: `That goal is already completed.` — completed goals are intentionally undeletable via the app (delete-archive noted in §14) |
+| `goal_delete` at ₱0 invested | confirm modal → ledger rows deleted app-level, recorded transactions STAY |
+| unknown goal id (POST) | error: `That goal no longer exists.` — no partial writes |
 | unknown `action` | error: `Choose a valid action.` |
-| unknown id on GET detail (no `id`) | 302 → `/goals.php` |
-| unknown id on GET detail (id present) | friendly "This goal does not exist." card, 200 |
 | any goal-save error | the shared goal modal auto-reopens server-rendered with the failed values |
+| any invest/take-back error | the respective modal auto-reopens with the failed amount, label and cap hint server-rendered |
 | any invest/take-back error | the respective modal auto-reopens with the failed amount |
 
 > Amount rules deliberately mirror make-transactions (ctype_digit, > 0, ≤
@@ -694,6 +771,10 @@ Categories endpoint, Goals list + detail. The wireframe's remaining screens
 (5–7) are now built.
 
 ### Deferred (deliberate, not bugs)
+- **Delete-archive for goals (user idea, 26 Oct)**: user noted that making
+  Delete possible even for funded/completed goals is attainable if deleted
+  goals go to an archive instead of vanishing — out of scope for now; until
+  then completed goals stay undeletable via the app (see §6c / §8).
 - Category rename/delete UI (add-only so far; removal is safe because stored
   categories on transactions are strings).
 - Real category editing on existing transactions (must edit via SQL today).
@@ -714,19 +795,20 @@ cd /opt/lampp/htdocs
 for f in *.php partials/*.php; do php -l "$f"; done
 
 # routes (expect 200 everywhere except "/" = 302, categories GET = 405,
-# and goal-details without an id = 302 to /goals.php)
+# and goal-details.php must be GONE (404) after the 26 Oct removal
 for r in / /dashboard.php /make-transactions.php /history.php "/history.php?view=weekly" \
-         "/history.php?type=expense&view=monthly" /summary.php \
+         "/history.php?type=expense&view=monthly" "/history.php?type=goal" /summary.php \
          "/summary.php?view=weekly" "/summary.php?view=monthly" "/summary.php?view=bogus" \
-         /goals.php "/goal-details.php?id=4" "/goal-details.php?id=999999"; do
+         /goals.php "/goal-details.php?id=4"; do
   curl -sS -o /dev/null -w "$r %{http_code}\n" "http://localhost$r"
 done
 curl -sS -o /dev/null -w "/categories.php GET (want 405) %{http_code}\n" "http://localhost/categories.php"
 
-# goals state sanity: ledger net must equal net movement of goal=1 transactions;
-# aggregates (goals.investment) positioned against both (all 0 on fresh data)
+# goals state sanity: ledger net should EQUAL net movement of goal=1
+# transactions (every goal txn comes from an app invest/take-back flow)
 mysql -h 127.0.0.1 -u user jbudget -e "
 SELECT (SELECT COUNT(*) FROM goals) AS goals,
+       (SELECT COUNT(*) FROM goals WHERE completed=1) AS completed,
        (SELECT COALESCE(SUM(amount),0) FROM goal_investments) AS ledger_net,
        (SELECT COALESCE(SUM(CASE WHEN goal=1 AND mode='-' THEN amount
                                  WHEN goal=1 THEN -amount ELSE 0 END),0)

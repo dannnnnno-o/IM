@@ -15,9 +15,12 @@ $activePage = "history";
 $perPage = 10;
 
 $typeInput = trim($_GET["type"] ?? "all");
-if(!in_array($typeInput, ["all", "income", "expense"], true)){
+if(!in_array($typeInput, ["all", "income", "expense", "goal"], true)){
     $typeInput = "all";
 }
+
+/* "goal" is orthogonal to direction: both invest (-) and take back (+) rows. */
+$goalOnly = $typeInput === "goal";
 
 $mode = match($typeInput){
     "income" => "+",
@@ -39,14 +42,14 @@ if($hasErrors){
     $rows = [];
 }
 else{
-    $total = count_filtered_transactions($pdo, $mode, $period["start"], $period["end"]);
+    $total = count_filtered_transactions($pdo, $mode, $period["start"], $period["end"], $goalOnly);
     $totalPages = max(1, (int) ceil($total / $perPage));
 
     $page = (int) ($_GET["page"] ?? 1);
     $page = max(1, min($page, $totalPages));
 
     $offset = ($page - 1) * $perPage;
-    $rows = get_filtered_transactions($pdo, $mode, $period["start"], $period["end"], $perPage, $offset);
+    $rows = get_filtered_transactions($pdo, $mode, $period["start"], $period["end"], $perPage, $offset, $goalOnly);
 }
 
 $countLabel = $typeInput === "all"
@@ -96,6 +99,7 @@ require_once("./partials/sidebar.php");
                         <option value="all"     <?= $typeInput === "all"     ? "selected" : "" ?>>All Types</option>
                         <option value="income"  <?= $typeInput === "income"  ? "selected" : "" ?>>Income</option>
                         <option value="expense" <?= $typeInput === "expense" ? "selected" : "" ?>>Expense</option>
+                        <option value="goal" <?= $typeInput === "goal" ? "selected" : "" ?>>Goal</option>
                     </select>
                 </form>
             </div>
@@ -143,7 +147,8 @@ require_once("./partials/sidebar.php");
                                 </td>
                                 <td class="text-end">
                                     <?php if($hasComment): ?>
-                                        <button type="button" class="comment-toggle" aria-expanded="false"
+                                        <button type="button" class="comment-toggle"
+                                                aria-expanded="<?= $goalOnly ? "true" : "false" ?>"
                                                 aria-controls="<?= $commentId ?>" aria-label="Toggle comment">
                                             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
                                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -154,7 +159,8 @@ require_once("./partials/sidebar.php");
                                 </td>
                             </tr>
                             <?php if($hasComment): ?>
-                                <tr class="comment-row" id="<?= $commentId ?>" hidden>
+                                <tr class="comment-row" id="<?= $commentId ?>"
+                                    <?= $goalOnly ? "" : "hidden" ?>>
                                     <td colspan="5" class="comment-cell"><?= htmlspecialchars($comment) ?></td>
                                 </tr>
                             <?php endif; ?>

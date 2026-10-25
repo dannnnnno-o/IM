@@ -11,7 +11,7 @@ const PREDEFINED_CATEGORIES = [
     "Goal Investment",
 ];
 
-/* Fixed category for invest/take-back rows written by goal-details.php.
+/* Fixed category for invest/take-back rows written by goals.php.
    Also part of PREDEFINED_CATEGORIES so History/Summary label it naturally. */
 const GOAL_CATEGORY = "Goal Investment";
 
@@ -239,13 +239,17 @@ function valid_date(string $value){
     return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
 }
 
-function get_filtered_transactions(object $pdo, string $mode, string $start, string $end, int $limit, int $offset){
+function get_filtered_transactions(object $pdo, string $mode, string $start, string $end, int $limit, int $offset, bool $goalOnly = false){
     $limit = max(1, (int) $limit);
     $offset = max(0, (int) $offset);
 
     $where = ["date BETWEEN :start AND :end"];
     if($mode !== ""){
         $where[] = "mode = :mode";
+    }
+    /* "Goal" tab: every goal-related transaction regardless of direction. */
+    if($goalOnly){
+        $where[] = "goal = 1";
     }
 
     $sql = "SELECT id, date, category, comment, mode, amount
@@ -265,10 +269,13 @@ function get_filtered_transactions(object $pdo, string $mode, string $start, str
     return $statement -> fetchAll(PDO::FETCH_ASSOC);
 }
 
-function count_filtered_transactions(object $pdo, string $mode, string $start, string $end){
+function count_filtered_transactions(object $pdo, string $mode, string $start, string $end, bool $goalOnly = false){
     $where = ["date BETWEEN :start AND :end"];
     if($mode !== ""){
         $where[] = "mode = :mode";
+    }
+    if($goalOnly){
+        $where[] = "goal = 1";
     }
 
     $sql = "SELECT COUNT(*) AS total
@@ -506,7 +513,7 @@ function expense_by_category(object $pdo, string $start, string $end){
 /* ---------- Goals ---------- */
 
 function get_goals(object $pdo){
-    $sql = "SELECT id, name, target_amount, target_date, investment
+    $sql = "SELECT id, name, target_amount, target_date, investment, completed, date_completed
             FROM goals
             ORDER BY id ASC; ";
 
@@ -517,7 +524,7 @@ function get_goals(object $pdo){
 }
 
 function get_goal(object $pdo, int $id){
-    $sql = "SELECT id, name, target_amount, target_date, investment
+    $sql = "SELECT id, name, target_amount, target_date, investment, completed, date_completed
             FROM goals
             WHERE id = :id; ";
 
@@ -551,6 +558,21 @@ function update_goal(object $pdo, int $id, string $name, int $targetAmount, stri
     $statement -> bindParam(":name", $name);
     $statement -> bindParam(":target_amount", $targetAmount, PDO::PARAM_INT);
     $statement -> bindParam(":target_date", $targetDate);
+    $statement -> bindParam(":id", $id, PDO::PARAM_INT);
+    $statement -> execute();
+
+    return true;
+}
+
+/* Explicit completion (24 Oct 2026 revision, 26 Oct): reaching the target
+   is no longer derived — the user confirms it. Records the completion date.
+   Callers validate "not already completed" and "investment >= target" first. */
+function mark_goal_complete(object $pdo, int $id){
+    $sql = "UPDATE goals
+            SET completed = 1, date_completed = CURDATE()
+            WHERE id = :id; ";
+
+    $statement = $pdo -> prepare($sql);
     $statement -> bindParam(":id", $id, PDO::PARAM_INT);
     $statement -> execute();
 
