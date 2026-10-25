@@ -42,7 +42,7 @@ adjustments
 1. Update Balance Tab -> Make Transaction Tab
 2. Clear out data
 3. Adjust UX for Goals
-4. Dedicated Goal Historys
+4. Dedicated Goal History
 5. Remove option "others" on update balance tab (soon-to-be Make Transaction Tab)
 6. Adjust Update Balance's Transaction Mode's dropdown style to match the global style
 7. Adjust Update Balance's Category "+ Add" button to "+ Add Custom Category" -> Done
@@ -58,3 +58,27 @@ Update Balance
 4. "Submit" to "Confirm Transaction"
 5. Autocomplete off for amount input
  
+Goal
+1. Dedicated Goal History
+    Each Goal Investment is already considered a transaction with column `goal` = 1;
+    add another tab inside transaction history. "Goal" and simply query select * from transactions where goal=1;
+    same table layout as the current transactions table will be used to display the results.
+
+    This will remove the goal-ledgers on each goals.
+    
+2. Adjust Goal Card
+    on-going state where `y = target amount`: 
+        ₱0: Invest (available), Take Back (unavailable), Complete (unavailable + not shown)
+        ₱X (non-zero): Invest (available), Take Back (available), Complete (unavailable + not shown)
+        ₱Y: Invest (unavailable), Take Back (available), Complete (available)
+    marked as complete:
+        invest, take back, and complete buttons are all unavailable.
+        added component: "Date Completed" (cur_date when marking as complete)
+3. "Mark as Complete?" prompt on clicking the "Complete" button on 100% reached goals
+
+3. Goals must be Marked as complete before being labeled as "Completed"
+    I've added a column "completed" with a default value of 0 for false, and should be updated to 1 once the goal is completed.
+
+4. Remove goal-details.php as every buttons will be available on the goal-card itself
+
+5. Separate Completed Goals from On-going goals
