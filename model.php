@@ -18,6 +18,10 @@ const GOAL_CATEGORY = "Goal Investment";
 const MAX_CUSTOM_CATEGORIES = 20;
 const MAX_CATEGORY_NAME_LENGTH = 30;
 
+/* Name cap for the landing page's name prompt (index.php). Matches the
+   users.username column width (varchar(50)); enforced before save_username(). */
+const MAX_USERNAME_LENGTH = 50;
+
 function get_custom_categories(object $pdo, int $userId){
     $sql = "SELECT categories FROM users WHERE id = :id; ";
 
@@ -118,6 +122,22 @@ function get_user(object $pdo, int $id){
 
     $result = $statement->fetch(PDO::FETCH_ASSOC);
     return $result;
+}
+
+/* First-visit gate for the landing page (index.php + the dashboard's
+   redirect). Single-account, no sessions (docs §10) — "first visit" is
+   simply users.username being empty/blank. Accepts the get_user() row and
+   tolerates false (missing row) as unnamed rather than type-fatal-ing. */
+function username_is_missing($user){
+    return trim((string) ($user["username"] ?? "")) === "";
+}
+
+function save_username(object $pdo, int $userId, string $name){
+    $sql = "UPDATE users SET username = :username WHERE id = :id; ";
+    $statement = $pdo -> prepare($sql);
+    $statement -> bindParam(":username", $name);
+    $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+    $statement -> execute();
 }
 
 function get_recent_transactions(object $pdo, int $limit = 5){
