@@ -6,22 +6,25 @@ Information Management project. Submitted by **Daniel Z. Baladad**.
 Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
 > Last updated: **26 Oct 2026 (late)** · Status: **Every feature from the
-> proposal is live**: Dashboard, "Make Transaction"
+> proposal is live**: the **Landing page** (first-visit name prompt,
+> Sprints 7–8) at `/`, Dashboard, "Make Transaction"
 > (`/make-transactions.php`, renamed 26 Oct), History (period picker +
 > Income/Expense/**Goal** type filter), Summary (**sectioned**: Income
 > Summary on top / Expense Summary below + Net card, two donuts),
 > Categories endpoint, and **Goals** (single route `/goals.php`: On-going /
-> Completed card sections, card-state-machine actions). See §14 for what
+> Completed card sections, card-state-machine actions). The DB was wiped
+> and re-seeded fresh 26 Oct — see Sprint 7. See §14 for what
 > remains deferred and §0 for session history.
 
 ---
 
 ## 0. Session handoff — read me first (grown 23–26 Oct 2026)
 
-For the agent picking this up: sprints 1–6 are the dated log of everything
+For the agent picking this up: sprints 1–7 are the dated log of everything
 that shipped, newest at the bottom. The list of *what shipped* doubles as
-the list of *what may surprise you*. Start at **Sprint 6** (26 Oct) — it
-changed the most, then read **Current state at session end** below it.
+the list of *what may surprise you*. Start at **Sprint 8**, then
+**Sprint 7**, then **Sprint 6** (all 26 Oct) — they changed the most —
+then read **Current state at session end** below it.
 
 ### Sprint 1 — Summary route + categories
 - `/summary.php` (donut + breakdown) and `/categories.php` (POST-only JSON
@@ -138,21 +141,110 @@ changed the most, then read **Current state at session end** below it.
   theirs to keep or delete). Follow the human's commit convention — commit
   their work only if asked.
 
+### Sprint 7 — Landing page + fresh DB (26 Oct 2026, newest)
+- tasks.txt's last build item — "Landing page (first visit, user gets
+  prompted for name)" — is DONE; the §6 "No Landing Page" decision was
+  overturned with the user's blessing. `/` is the landing **only while
+  `users.username` is empty/blank**: a centered name-prompt card that
+  self-POSTs, saves via `UPDATE users SET username …`, and 302s to the
+  dashboard. Once named, `/` returns to the old behavior (302 straight
+  to the dashboard) — even a POST to `/` redirects **before** POST
+  handling, so renaming through the landing is impossible once the gate
+  is closed. `dashboard.php` carries the same gate (unnamed direct visit
+  → 302 `/`) so the prompt can't be URL-bypassed; other routes don't
+  read the name and need no gate.
+- The gate rule is single-sourced: `username_is_missing()` in model.php
+  (the `resolve_period()` convention), writes only via `save_username()`
+  — prepared UPDATE of `users.username` ONLY; balance/categories are
+  untouched. Cap `MAX_USERNAME_LENGTH = 50` (matches `varchar(50)`);
+  messages "Name is required." / "Name must be 50 characters or fewer."
+  (full table in §8). Name is stored plaintext (like categories) and
+  escaped at render — an XSS payload as the name was QA'd and renders
+  inert in the dashboard greeting.
+- **Still no sessions/cookies (§10 posture holds)**: "first visit" is
+  literally the username column being empty. Re-demo trick:
+  `UPDATE users SET username = '' WHERE id = 1;`
+- **DB wipe + re-seed completed this session** (the human cleared the
+  tables between sessions; the agent finished the job): TRUNCATE on
+  `transactions` / `goals` / `goal_investments` / `archived_goals` (id
+  counters reset to 1 — the DELETE-style clear had left them at
+  40/9/11), the `users` row id=1 re-seeded (balance 0, username '',
+  categories '[]'), and one **orphaned `goal_investments` ledger row**
+  (goal 1's +₱200; its goal and transaction were both already deleted)
+  removed. Two ripple findings from the half-cleared state, general
+  lesson since the human will wipe again before submission: (1) the
+  users row must EXIST before any transactions are created — its row is
+  assumed by every route's `get_user($pdo, 1)` and by the balance
+  UPDATE inside `create_transaction()` (missing row ⇒ balances silently
+  stop updating and a later re-seed with balance 0 while rows exist
+  manufactures instant drift); (2) the goal delete order in §11 applies
+  to manual wipes too — after any wipe, re-run the §15 goals-sanity
+  equation (`ledger_net` must equal `goal_txn_net`; a lone leftover
+  ledger row breaks it and trips the check).
+- New table `archived_goals` exists (columns mirror `goals`) — the
+  human's prep for the §14 archive-optional; no PHP references it yet,
+  it is inert. Don't mistake the goals model for duplicated work and
+  don't "rediscover" it as a bug.
+- CSS_VERSION bumped to `20261026-2` (added a `.landing-*` block to
+  global.css: full-viewport centered card, no sidebar). QA'd: curl
+  matrix (unnamed/named 200s+302s, empty + 51-char POSTs re-render with
+  errors and no write, valid POST persists, rename-through-landing
+  blocked), drift query 0, headless-Chromium screenshots of the landing
+  at 1280×900 and 420×850 (both clean).
+
+### Sprint 8 — Landing 2.0, mockup adoption (26 Oct 2026, newest)
+- The human's `landing-page.png` (repo root, untracked — theirs to keep or
+  delete) drove this revision: a wallet-icon tile + "J-Budget" wordmark +
+  "Track · Save · Achieve" tagline above the prompt (kills the earlier
+  "feels empty" note — the card now has a real identity stack), prompt
+  copy "What should we call you?", an inline person glyph inside the
+  input, and a **Confirm-before-lock modal**. The mockup's black wallet
+  became `--brand-text` line-art on a `--bg-input` tile (user said pick
+  what complements the app; the tile mirrors the dashboard's
+  `.balance-icon` pattern), and the modal is the app's standard dark
+  Bootstrap modal titled "J-Budget" per user decision.
+- Modal behavior: Confirm opens it with the typed name interpolated via
+  `textContent` (XSS-safe — never innerHTML), copy verbatim from the
+  mockup ("Note that at this part of development, the name cannot be
+  changed yet. Proceed with the name <N>?"), **Go Back** dismisses (input
+  keeps its value), **Proceed** submits the same once-only gated POST as
+  Sprint 7. Purely client-side — zero server change, no rename feature
+  added; the modal just documents the first-visit lock in-product.
+  Empty-name submits skip the modal and POST straight through so the
+  server renders "Name is required." (§8).
+- **Trap hit and fixed (26 Oct)**: the first version wired the confirm JS
+  at script-parse time and touched `bootstrap.Modal` before the bundle
+  (footer.php) had loaded → `ReferenceError` killed the whole listener →
+  Confirm fell through to a NATIVE submit and saved the name directly
+  (the exact "bundle loads after page scripts" trap documented in §6c).
+  Fixed by wrapping the wiring in a DOMContentLoaded listener — the same
+  house pattern as the goals pages — and creating the Modal instance
+  lazily inside the submit handler. Never touch `bootstrap.*` in a
+  script that runs at parse time.
+- CSS_VERSION → `20261026-3`. Verified with a recreated CDP script
+  (`/tmp/opencode/landing-confirm.mjs`, the §13 template rebuilt from
+  scratch after the reboot): modal visible + name interpolated
+  (screenshot at `/tmp/opencode/landing-modal.png`), Go Back → closed,
+  still unnamed, input kept; Proceed → dashboard greeting; drift 0.
+  After QA, `users.username` was restored to '' — the landing is live
+  for the demo, as decided in Sprint 7.
+
 ### Current state at session end
-- DB right now (26 Oct 2026 late): `transactions` 14 rows, `users` balance
-  199739, **balance drift 0** (the human re-categorizes and edits rows
-  between sessions — earlier snapshots said 13 rows / 199939; whatever you
-  see, trust the drift query, not historical numbers). `goals` 4 rows with
-  **Sample Goal 4 explicitly completed** (`completed=1, date_completed=
-  2026-10-26`, 300/300) — the Completed-card path is live data now, not a
-  fixture. `goal_investments` has **1 row** (net +200: the human invested
-  ₱200 in Sample Goal through the old 24–26 Oct detail flow) and its net
-  equals the net of `goal = 1` transactions — hand-check that equality via
-  the §15 goals-sanity query after any write-path change. The human kept
-  editing after that (Sample Goal 4's target went 300 → 310 → back to 300).
-  Live edits are expected — snapshot the baseline before QA cycles and
-  restore exactly after.
-- Verified working: routes 200/302 (goal-details 404), donut math asserted
+- DB right now (26 Oct 2026, after the human's wipe + Sprint 7 re-seed):
+  `transactions`, `goals`, `goal_investments`, `archived_goals` are all
+  EMPTY (id counters at 1); `users` is the freshly seeded single row
+  id=1 (balance 0, username '', categories '[]'), **balance drift 0**.
+  The app is deliberately in its first-visit state — `/` serves the
+  landing until the user names themselves, and the dashboard sits
+  behind the same gate. Historical row counts in older bullets (13/14
+  transactions, Sample Goal 4 completed, the +₱200 ledger row) describe
+  the pre-wipe world; none of it exists anymore (the /tmp backups have
+  perished too — the doc warned they would). Trust the live queries in
+  §15, not historical numbers. Live edits are still expected before the
+  demo — snapshot before QA cycles and restore exactly after.
+- Verified working: routes 200/302 (goal-details 404), landing gate
+  (unnamed `/` 200 + dashboard 302; named, both reverse; POSTs to `/` while
+  named redirect before write), donut math asserted
   from the served DOM (offsets contiguous, `Σlength == circumference`,
   both donuts, Daily 1-slice case, empty month), 2-decimal share formats
   every place percentages render (Summary Share column + donut arias,
@@ -232,7 +324,8 @@ cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js vendor/bootstrap/
 
 ```
 /opt/lampp/htdocs/
-├── index.php            → 302 redirect to dashboard.php
+├── index.php            route: Landing (name prompt) while users.username is
+│                          empty (§6); 302 → dashboard.php once named
 ├── dashboard.php        route: dashboard
 ├── make-transactions.php route: "Make Transaction" entry form (+ Add Category
 │                         modal) — renamed from update-balance.php 26 Oct 2026
@@ -367,7 +460,7 @@ originals failed AA as text.
 
 | Route | Status | Notes |
 |---|---|---|
-| `/` | done | 302 → dashboard |
+| `/` | done | **Landing page** (Sprint 7): first-visit name prompt while `users.username` is empty; 302 → dashboard once named |
 | `/dashboard.php` | done | balance card, week/month expense cards, goal count, recent 5 |
 | `/make-transactions.php` | done | "Make Transaction" (renamed 26 Oct 2026, ex update-balance.php). POST form → dashboard redirect; category picker + Add Category modal |
 | `/history.php` | done | shared period picker (All Time default + Daily/Week/Month), type filter, pagination, expandable comments |
@@ -375,9 +468,34 @@ originals failed AA as text.
 | `/categories.php` | done | JSON endpoint. POST `name=` → 201/400; GET → **405** |
 | `/goals.php` | done | goal list (On-going/Completed sections) + ALL actions on cards: invest, take back, complete (confirm modal), edit, delete (blocked while invested) |
 
-**No Landing Page.** Single-account context plus a populated `users` table means
-the name prompt is unnecessary; `index.php` redirects to the dashboard instead.
-This was a deliberate decision — revisit only if a panelist expects one.
+**Landing page (Sprint 7, 26 Oct):** the earlier "No Landing Page" decision
+was overturned once the panelist expectation became concrete (tasks.txt's
+final build item). Rules of record:
+
+- `/` shows the name prompt **only while `users.username` is empty/blank**;
+  after a valid POST it redirects to the dashboard, and from then on `/`
+  is a plain 302 again (the same unconditional redirect as pre-Sprint 7) —
+  the app's day-one behavior is unchanged after the first visit.
+- `dashboard.php` gates the same way: an unnamed direct visit 302s to `/`.
+  Other routes never read the name, so they intentionally stay ungated.
+- The gate is `username_is_missing()` in model.php — single rule, two
+  consumers (index.php + dashboard.php). Writes go through
+  `save_username()` (prepared UPDATE of username only).
+- Still **no sessions/cookies anywhere** (§10 posture holds): "first
+  visit" is literally an empty column. To re-demo the landing:
+  `UPDATE users SET username = '' WHERE id = 1;`
+- POST handling runs only behind the open gate — once named, `/` redirects
+  before reading POST, so the landing cannot be used to rename. Renaming
+  is a SQL-only path by design (no profile/renaming feature exists).
+- **Confirm-before-lock modal (Sprint 8, from `landing-page.png`)**:
+  Confirm opens the app's standard dark modal with the typed name
+  interpolated via `textContent` and the mockup's "cannot be changed yet"
+  copy verbatim; Proceed submits the same gated POST, Go Back dismisses
+  with the input kept. Client-side only — the server never sees it, and
+  a client-side wrapping cannot rename anything (the POST stays once-only).
+  Empty names skip the modal so the server prints "Name is required."
+  The confirm JS must wire up inside DOMContentLoaded (house pattern —
+  the bundle loads after page scripts; see Sprint 8's trap note).
 
 ## 6b. Categories design (updated 23 Oct 2026)
 
@@ -559,6 +677,22 @@ inputs share one message.
 counts as 4 and would trip a "250 character" limit at ~62 visible characters.
 The JS counter uses `Array.from(value).length` to match exactly.
 
+### Landing (first-visit name prompt, added 26 Oct Sprint 7)
+| Case | Message |
+|---|---|
+| name blank / whitespace-only | "Name is required." |
+| name > 50 chars (`mb_strlen`, matches `users.username` varchar(50)) | "Name must be 50 characters or fewer." |
+| valid | saved **trimmed** → 302 to `/dashboard.php` |
+
+> The POST only executes behind the open gate (username still empty); once
+> named, `/` redirects before any POST is read. Input is stored plaintext
+> (like categories) and `htmlspecialchars()`-escaped at render; an XSS
+> payload as the name renders strictly inert. Sprint 8's client-side
+> Confirm modal wraps valid submits (Proceed is what actually POSTs); a
+> blank input then jumps straight to the server, so all rows above
+> enforce. History/Summary/Goals
+> validation tables follow.
+
 ### History filters
 | Case | Behaviour |
 |---|---|
@@ -730,7 +864,9 @@ Single-account, university project, no auth by design. Still:
 
 - **All user input is `htmlspecialchars()`-escaped at render**, including
   `comment`, category names (a `<script>` payload stored as a
-  custom category renders escaped), and every GET param reflected into
+  custom category renders escaped), the landing-prompt username (a
+  `<script>` payload stored as the name renders escaped in the
+  dashboard greeting — QA'd 26 Oct, Sprint 7), and every GET param reflected into
   `value=""`.
 - **All queries use prepared statements** with bound params. `mode`, `start`,
   `end`, `category` are bound; `LIMIT`/`OFFSET` are cast to `int` before
@@ -857,10 +993,11 @@ adding before submission.
 ## 14. What's left — build complete, deferred items
 
 Goals shipped 24 Oct 2026 (see §6c for the locked design, §4 for the schema,
-§8 for the validation table). With it, **every route in the proposal is
-live**: Dashboard, Make Transaction (ex Update Balance), History, Summary,
-Categories endpoint, Goals list + detail. The wireframe's remaining screens
-(5–7) are now built.
+§8 for the validation table); the **Landing page shipped 26 Oct** (Sprint 7
+— gates + rules in §6, validation table in §8). With it, **every route in
+the proposal is live**: Landing, Dashboard, Make Transaction (ex Update
+Balance), History, Summary, Categories endpoint, Goals. The wireframe's
+remaining screens (5–7) are now built — **the build is complete**.
 
 ### Deferred (deliberate, not bugs)
 - **Delete-archive for goals (user idea, 26 Oct)**: user noted that making
@@ -886,15 +1023,25 @@ cd /opt/lampp/htdocs
 # lint everything
 for f in *.php partials/*.php; do php -l "$f"; done
 
-# routes (expect 200 everywhere except "/" = 302, categories GET = 405,
-# and goal-details.php must be GONE (404) after the 26 Oct removal
-for r in / /dashboard.php /make-transactions.php /history.php "/history.php?view=weekly" \
+# routes (expect 200 everywhere except: categories GET = 405, and
+# goal-details.php must be GONE (404) after the 26 Oct removal).
+# "/" and /dashboard.php are conditional on users.username (first-visit
+# gate, Sprint 7 / §6):
+#   unnamed:  "/" 200 (landing form)  /  dashboard.php 302 -> /
+#   named:    "/" 302 -> /dashboard.php  /  dashboard.php 200
+for r in /dashboard.php /make-transactions.php /history.php "/history.php?view=weekly" \
          "/history.php?type=expense&view=monthly" "/history.php?type=goal" /summary.php \
          "/summary.php?view=weekly" "/summary.php?view=monthly" "/summary.php?view=bogus" \
          /goals.php "/goal-details.php?id=4"; do
   curl -sS -o /dev/null -w "$r %{http_code}\n" "http://localhost$r"
 done
+curl -sS -o /dev/null -w "/ (unnamed) %{http_code}\n" "http://localhost/"
 curl -sS -o /dev/null -w "/categories.php GET (want 405) %{http_code}\n" "http://localhost/categories.php"
+
+# landing flow, while unnamed: invalid POSTs re-render 200 with their message
+# and write nothing; a valid name 302s to the dashboard. Restore with:
+#   UPDATE users SET username = '' WHERE id = 1;
+# POST while named -> 302 (gate closes before POST handling; no rename path).
 
 # goals state sanity: ledger net should EQUAL net movement of goal=1
 # transactions (every goal txn comes from an app invest/take-back flow)
@@ -907,13 +1054,16 @@ SELECT (SELECT COUNT(*) FROM goals) AS goals,
           FROM transactions) AS goal_txn_net,
        (SELECT COUNT(*) FROM goals WHERE investment > 0) AS preexisting;"
 
-# balance must be in sync (drift column must be 0)
+# balance must be in sync (drift column must be 0; COALESCE variant because
+# SUM() over an EMPTY transactions table reads NULL and would frame "no rows"
+# as drift NULL instead of the legit fresh-DB 0)
 mysql -h 127.0.0.1 -u user jbudget -e "
 SELECT (SELECT balance FROM users WHERE id=1) AS stored,
-       SUM(CASE WHEN mode='+' THEN amount ELSE -amount END) AS computed,
+       COALESCE((SELECT SUM(CASE WHEN mode='+' THEN amount ELSE -amount END)
+                 FROM transactions),0) AS computed,
        (SELECT balance FROM users WHERE id=1)
-         - SUM(CASE WHEN mode='+' THEN amount ELSE -amount END) AS drift
-FROM transactions;"
+         - COALESCE((SELECT SUM(CASE WHEN mode='+' THEN amount ELSE -amount END)
+                     FROM transactions),0) AS drift;"
 
 # custom categories JSON must parse
 mysql -h 127.0.0.1 -u user jbudget -N -e "

@@ -454,3 +454,84 @@ a.nav-link:hover {
     justify-content: center;
   }
 }
+
+/* ---- Landing (first-visit name prompt) ---- */
+
+.landing {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.landing-card {
+  width: min(420px, 100%);
+}
+
+.landing-header {
+  text-align: center;
+}
+
+.landing-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--brand-text);
+}
+
+.landing-icon svg {
+  width: 34px;
+  height: 34px;
+}
+
+.landing-title {
+  font-size: 1.25rem;
+}
+
+.landing-tagline {
+  color: var(--text-muted);
+  font-size: .875rem;
+  letter-spacing: .08em;
+  margin-top: .25rem;
+}
+
+.landing-card h1 {
+  margin-top: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.landing-input-wrap {
+  position: relative;
+}
+
+.landing-input-wrap svg {
+  position: absolute;
+  left: .875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.landing-input {
+  padding-left: 2.5rem;
+}
+
+.landing-card .alert {
+  text-align: left;
+}
+
+@media (max-width: 767.98px) {
+  .landing {
+    padding: 1rem;
+  }
+}
