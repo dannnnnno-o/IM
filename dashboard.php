@@ -8,14 +8,31 @@ catch(PDOException $e){
 }
 
 $user = get_user($pdo, 1);
+
+/* First-visit gate: an empty stored name means the landing page (index.php)
+   has not been completed yet — bounce there instead of greeting "" with a
+   null balance. Other routes don't read the name, so only this page gates. */
+if(username_is_missing($user)){
+    header("Location: /");
+    exit;
+}
+
+if(isset($_GET["registered"])){
+    $welcome_msg = "Welcome, ";
+}
+
+else{
+    $welcome_msg = "Welcome back, ";
+}
+
 $today = new DateTimeImmutable("today");
 
-[$weekStart, $weekEnd] = week_range($today);
-[$monthStart, $monthEnd] = month_range($today);
-
-$weekExpenses   = sum_amount($pdo, "-", $weekStart, $weekEnd);
-$monthExpenses  = sum_amount($pdo, "-", $monthStart, $monthEnd);
-$totalGoals     = count_rows($pdo, "goals");
+/* Stat cards read today's movement (26 Oct revision): income and expenses
+   for the current day only, bounded [today, today]. */
+$todayStr      = $today->format("Y-m-d");
+$todayIncome   = sum_amount($pdo, "+", $todayStr, $todayStr);
+$todayExpenses = sum_amount($pdo, "-", $todayStr, $todayStr);
+$totalGoals    = count_rows($pdo, "goals");
 $totalTxns      = count_rows($pdo, "transactions");
 $recent         = get_recent_transactions($pdo, 5);
 
@@ -35,7 +52,7 @@ require_once("./partials/sidebar.php");
         <div>
             <h1 class="h4 mb-1">Dashboard</h1>
             <p class="text-muted mb-0">
-                Welcome back, <?= htmlspecialchars($user["username"]) ?>
+                <?=$welcome_msg . htmlspecialchars($user["username"]) ?>
                 &middot; <?= $today->format("D, M j, Y") ?>
             </p>
         </div>
@@ -68,23 +85,41 @@ require_once("./partials/sidebar.php");
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="card p-3 h-100">
-                <div class="text-muted small mb-2">This Week &middot; Expenses</div>
-                <div class="h5 mb-0 stat-expense"><?= peso($weekExpenses) ?></div>
-                <div class="text-muted tiny mt-1"><?= $weekStart ?> &rarr; <?= $weekEnd ?></div>
+                <div class="text-muted small mb-2">Today &middot; Income</div>
+                <div class="h5 mb-0 stat-income"><?= peso($todayIncome) ?></div>
+                <div class="text-muted tiny mt-1"><?= $today->format("F j") ?></div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 h-100">
-                <div class="text-muted small mb-2">This Month &middot; Expenses</div>
-                <div class="h5 mb-0 stat-expense"><?= peso($monthExpenses) ?></div>
-                <div class="text-muted tiny mt-1"><?= $monthStart ?> &rarr; <?= $monthEnd ?></div>
+                <div class="text-muted small mb-2">Today &middot; Expenses</div>
+                <div class="h5 mb-0 stat-expense"><?= peso($todayExpenses) ?></div>
+                <div class="text-muted tiny mt-1"><?= $today->format("F j") ?></div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 h-100 d-flex flex-column">
                 <div class="text-muted small mb-2">Total Goals</div>
                 <div class="h5 mb-0"><?= $totalGoals ?></div>
-                <div class="text-muted tiny mt-1"><?= $totalTxns ?> transactions logged</div>
+
+                <div class="text-muted tiny mt-1">
+                <?php
+                    $goal_msg;
+                    switch ($totalGoals) {
+                        case 0:
+                            $goal_msg = "<a href=\"/goals.php?set=goal\">Set a goal</a> to get started.";
+                            break;
+                        
+                        case 1:
+                            $goal_msg = "Keep working towards your goal :>";
+                            break;
+                        default: 
+                            $goal_msg = "Keep working toward your goals :>";
+                            break;
+                    }
+                    echo $goal_msg;
+                ?>
+                </div>
             </div>
         </div>
     </div>
