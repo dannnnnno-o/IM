@@ -39,6 +39,14 @@ $takeBackGoalId = "";
 $takeBackGoalName = "";
 $takeBackCap = 0;
 
+/* Dashboard "Set a goal" deep link (/goals.php?set=goal): land on the Goals
+   tab with the Set/Edit modal already open. GET only — a failed goal_save
+   POST re-renders without this param, so the two reopen paths can't
+   interfere (§8). Unknown set values are simply ignored below. */
+if(trim($_GET["set"] ?? "") === "goal"){
+    $reopenGoalModal = true;
+}
+
 function goal_amount_error(string $input){
     if($input === ""){
         return "Amount is required.";
