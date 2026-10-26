@@ -40,20 +40,20 @@ $reopenGoalModal = !empty($reopenGoalModal);
 
                     <div class="mb-3">
                         <label class="form-label" for="goalName">Goal Name</label>
-                        <input type="text" class="form-control" id="goalName" name="name" maxlength="255"
+                        <input type="text" autocomplete="off" class="form-control" id="goalName" name="name" maxlength="255"
                                placeholder="e.g. New Laptop, Emergency Fund" value="<?= htmlspecialchars($form["name"]) ?>">
                         <div class="form-text"><span id="goalNameCount">0</span>/255 characters</div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label" for="goalTarget">Target Amount</label>
-                        <input type="text" inputmode="numeric" class="form-control" id="goalTarget" name="target_amount"
+                        <input type="text" autocomplete="off" inputmode="numeric" class="form-control" id="goalTarget" name="target_amount"
                                placeholder="Enter amount (integer only)" value="<?= htmlspecialchars($form["target_amount"]) ?>">
                     </div>
 
                     <div class="mb-1">
                         <label class="form-label" for="goalDate">Target Date</label>
-                        <input type="text" class="form-control" id="goalDate" name="target_date" maxlength="255"
+                        <input type="text" autocomplete="off" class="form-control" id="goalDate" name="target_date" maxlength="255"
                                placeholder="e.g. November 5, 2026 — free text, no validation"
                                value="<?= htmlspecialchars($form["target_date"]) ?>">
                         <div class="form-text">Any format is accepted; the app does not validate goal dates.</div>
@@ -171,6 +171,13 @@ $reopenGoalModal = !empty($reopenGoalModal);
             label.textContent = <?= $form["id"] !== "" ? '"Edit Goal"' : '"Set New Goal"' ?>;
         }
         bootstrap.Modal.getOrCreateInstance(document.getElementById("goalModal")).show();
+        /* Deep-linked opens (dashboard "Set a goal" → /goals.php?set=goal,
+           Sprint 9) drop the param once the modal is up so a refresh stays
+           quiet; a failed-POST reopen has no param in the URL to begin with,
+           so this rewrite is a no-op there. */
+        if(window.history && window.history.replaceState){
+            window.history.replaceState(null, "", "/goals.php");
+        }
     });
     <?php endif; ?>
 })();
