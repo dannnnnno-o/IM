@@ -16,45 +16,75 @@ $period = resolve_period($pdo, $_GET, $today, ["allowAll" => false]);
 $errors = $period["errors"];
 $hasErrors = !empty($errors);
 
-if($hasErrors){
-    $breakdown = [];
-}
-else{
-    $breakdown = expense_by_category($pdo, $period["start"], $period["end"]);
-}
-
-$total = 0;
-foreach($breakdown as $slice){
-    $total += $slice["total"];
-}
-
 $chartColors = [
     "--chart-1", "--chart-2", "--chart-3", "--chart-4",
     "--chart-5", "--chart-6", "--chart-7", "--chart-8",
 ];
 
-$donutRadius = 82;
-$donutStroke = 28;
-$donutCircumference = 2 * M_PI * $donutRadius;
+/* One donut per direction (Income Summary / Expense Summary, 26 Oct 2026
+   revision). Same hand-rolled SVG math for both; chart tokens only. */
+function sum_donut(array $rows, string $mode, array $chartColors){
+    $radius = 82;
+    $stroke = 28;
+    $circumference = 2 * M_PI * $radius;
 
-foreach($breakdown as $index => $slice){
-    $share = $total > 0 ? $slice["total"] / $total * 100 : 0;
-    $breakdown[$index]["share"] = (int) round($share);
-    $breakdown[$index]["color"] = $chartColors[$index % count($chartColors)];
-    $breakdown[$index]["length"] = $total > 0 ? $slice["total"] / $total * $donutCircumference : 0;
-    $breakdown[$index]["offset"] = 0;
-
-    if($index > 0){
-        $breakdown[$index]["offset"] = -($breakdown[$index - 1]["offset"] + $breakdown[$index - 1]["length"]);
+    $total = 0;
+    foreach($rows as $slice){
+        $total += $slice["total"];
     }
+
+    /* Stacked-dash math: slice i must START where slices 0..i-1 ended, i.e.
+       dashoffset = -(cumulative length so far). The earlier double-negating
+       recursion displaced every second slice (26 Oct regression). */
+    $cumulative = 0.0;
+    foreach($rows as $index => $slice){
+        $share = $total > 0 ? $slice["total"] / $total * 100 : 0;
+        $rows[$index]["share"] = round($share, 2);
+        $rows[$index]["color"] = $chartColors[$index % count($chartColors)];
+        $rows[$index]["length"] = $total > 0 ? $slice["total"] / $total * $circumference : 0;
+        $rows[$index]["offset"] = -$cumulative;
+        $cumulative += $rows[$index]["length"];
+    }
+
+    /* Close the ring exactly: float ratios can leave a sub-pixel shortfall
+       which reads as a visible notch at the 12-o'clock seam. */
+    if(!empty($rows) && $total > 0){
+        $last = count($rows) - 1;
+        $rows[$last]["length"] += $circumference - $cumulative;
+    }
+
+    $label = $mode === "+" ? "income" : "expenses";
+    $ariaSlices = [];
+    foreach($rows as $slice){
+        $ariaSlices[] = $slice["category"] . " " . number_format($slice["share"], 2) . "%";
+    }
+    $aria = "Donut chart of " . $label . ": "
+        . ($rows ? implode(", ", $ariaSlices) : "no " . $label) . ".";
+
+    return [
+        "slices"       => $rows,
+        "total"        => $total,
+        "aria"         => $aria,
+        "radius"       => $radius,
+        "stroke"       => $stroke,
+        "circumference" => $circumference,
+    ];
 }
 
-$ariaSlices = [];
-foreach($breakdown as $slice){
-    $ariaSlices[] = $slice["category"] . " " . $slice["share"] . "%";
+if($hasErrors){
+    $incomeRows = [];
+    $expenseRows = [];
 }
-$donutAria = "Donut chart of expenses, " . $period["rangeLabel"] . ": "
-    . ($breakdown ? implode(", ", $ariaSlices) : "no expenses") . ".";
+else{
+    /* Goal transfers stay included by design: invest rows sit among the
+       expenses, take-back rows among the income (locked 24 Oct 2026). */
+    $incomeRows = sum_by_category($pdo, $period["start"], $period["end"], "+");
+    $expenseRows = sum_by_category($pdo, $period["start"], $period["end"], "-");
+}
+
+$incomeDonut = sum_donut($incomeRows, "+", $chartColors);
+$expenseDonut = sum_donut($expenseRows, "-", $chartColors);
+$net = $incomeDonut["total"] - $expenseDonut["total"];
 
 $periodConfig = [
     "action" => "/summary.php",
@@ -70,8 +100,8 @@ require_once("./partials/sidebar.php");
 
     <header class="page-header">
         <div>
-            <h1 class="h4 mb-1">Expense Summary</h1>
-            <p class="text-muted mb-0">Where your money goes &middot; <?= $period["rangeLabel"] ?></p>
+            <h1 class="h4 mb-1">Summary</h1>
+            <p class="text-muted mb-0">Money in and out &middot; <?= $period["rangeLabel"] ?></p>
         </div>
     </header>
 
@@ -89,67 +119,98 @@ require_once("./partials/sidebar.php");
         </div>
     <?php endif; ?>
 
-    <?php if(empty($breakdown)): ?>
-        <div class="card">
-            <div class="card-body text-center py-5">
-                <p class="text-muted mb-0">No expenses in this period.</p>
-            </div>
-        </div>
-    <?php else: ?>
-        <div class="row g-3">
-            <div class="col-md-5">
-                <div class="card h-100">
-                    <div class="card-body d-flex flex-column align-items-center justify-content-center">
-                        <svg class="donut-chart" viewBox="0 0 210 210" role="img"
-                             aria-label="<?= htmlspecialchars($donutAria) ?>">
-                            <?php foreach($breakdown as $slice): ?>
-                                <circle cx="105" cy="105" r="<?= $donutRadius ?>"
-                                        fill="none" stroke="var(<?= $slice["color"] ?>)"
-                                        stroke-width="<?= $donutStroke ?>"
-                                        stroke-dasharray="<?= $slice["length"] ?> <?= $donutCircumference ?>"
-                                        stroke-dashoffset="<?= $slice["offset"] ?>"
-                                        transform="rotate(-90 105 105)" />
-                            <?php endforeach; ?>
-                            <text x="105" y="97" text-anchor="middle" class="donut-label">Total Expenses</text>
-                            <text x="105" y="123" text-anchor="middle" class="donut-total"><?= peso($total) ?></text>
-                        </svg>
-                    </div>
+    <?php
+        /* One renderer for both sections (docs: single implementation). */
+        function render_summary_section(array $donut, string $heading, string $centerFirst, string $amountClass, string $emptyText){
+    ?>
+        <h2 class="h5 mb-3"><?= $heading ?></h2>
+        <?php if(empty($donut["slices"])): ?>
+            <div class="card mb-4">
+                <div class="card-body text-center py-5">
+                    <p class="text-muted mb-0"><?= htmlspecialchars($emptyText) ?></p>
                 </div>
             </div>
-
-            <div class="col-md-7">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table align-middle mb-0 summary-table">
-                                <thead>
-                                    <tr>
-                                        <th>Category</th>
-                                        <th class="text-end">Share</th>
-                                        <th class="text-end">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                <?php foreach($breakdown as $slice): ?>
-                                    <tr>
-                                        <td>
-                                            <span class="d-inline-flex align-items-center gap-2">
-                                                <span class="legend-dot" style="background: var(<?= $slice["color"] ?>);" aria-hidden="true"></span>
-                                                <?= htmlspecialchars($slice["category"]) ?>
-                                            </span>
-                                        </td>
-                                        <td class="text-end text-muted"><?= $slice["share"] ?>%</td>
-                                        <td class="text-end fw-semibold stat-expense"><?= peso($slice["total"]) ?></td>
-                                    </tr>
+        <?php else: ?>
+            <div class="row g-3 mb-4">
+                <div class="col-md-5">
+                    <div class="card h-100">
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                            <svg class="donut-chart" viewBox="0 0 210 210" role="img"
+                                 aria-label="<?= htmlspecialchars($donut["aria"]) ?>">
+                                <?php foreach($donut["slices"] as $slice): ?>
+                                    <circle cx="105" cy="105" r="<?= $donut["radius"] ?>"
+                                            fill="none" stroke="var(<?= $slice["color"] ?>)"
+                                            stroke-width="<?= $donut["stroke"] ?>"
+                                            stroke-dasharray="<?= $slice["length"] ?> <?= $donut["circumference"] ?>"
+                                            stroke-dashoffset="<?= $slice["offset"] ?>"
+                                            transform="rotate(-90 105 105)" />
                                 <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                                <text x="105" y="97" text-anchor="middle" class="donut-label"><?= $centerFirst ?></text>
+                                <text x="105" y="123" text-anchor="middle" class="donut-total"><?= peso($donut["total"]) ?></text>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0 summary-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th class="text-end">Share</th>
+                                            <th class="text-end">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    <?php foreach($donut["slices"] as $slice): ?>
+                                        <tr>
+                                            <td>
+                                                <span class="d-inline-flex align-items-center gap-2">
+                                                    <span class="legend-dot" style="background: var(<?= $slice["color"] ?>);" aria-hidden="true"></span>
+                                                    <?= htmlspecialchars($slice["category"]) ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-end text-muted"><?= number_format($slice["share"], 2) ?>%</td>
+                                            <td class="text-end fw-semibold <?= $amountClass ?>"><?= peso($slice["total"]) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+        <?php endif; ?>
+    <?php
+        }
+
+        render_summary_section($incomeDonut, "Income Summary", "Total Income", "stat-income", "No income in this period.");
+        render_summary_section($expenseDonut, "Expense Summary", "Total Expenses", "stat-expense", "No expenses in this period.");
+    ?>
+
+    <h2 class="h5 mb-3">Net</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="row text-center gy-3">
+                <div class="col-md-4">
+                    <div class="tiny text-muted mb-1">Total Income</div>
+                    <div class="h5 mb-0 stat-income"><?= peso($incomeDonut["total"]) ?></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="tiny text-muted mb-1">Total Expenses</div>
+                    <div class="h5 mb-0 stat-expense"><?= peso($expenseDonut["total"]) ?></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="tiny text-muted mb-1">Net change in balance</div>
+                    <div class="h5 mb-0 <?= ($net > 0 ? "stat-income" : ($net < 0 ? "stat-expense" : "text-muted")) ?>"><?= peso($net) ?></div>
+                </div>
+            </div>
         </div>
-    <?php endif; ?>
+    </div>
 
 </main>
 

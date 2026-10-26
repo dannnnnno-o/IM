@@ -5,20 +5,23 @@ Information Management project. Submitted by **Daniel Z. Baladad**.
 
 Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
-> Last updated: **26 Oct 2026**
-> Status: **Every feature from the proposal is live**: Dashboard, "Make
-> Transaction" (`/make-transactions.php`, renamed 26 Oct), History
-> (period picker + type filter), Summary (donut + category breakdown),
-> Categories endpoint, and **Goals** (list + details + invest / take back /
-> edit / delete). See §14 for what remains deferred and §0 for session
-> history.
+> Last updated: **26 Oct 2026 (late)** · Status: **Every feature from the
+> proposal is live**: Dashboard, "Make Transaction"
+> (`/make-transactions.php`, renamed 26 Oct), History (period picker +
+> Income/Expense/**Goal** type filter), Summary (**sectioned**: Income
+> Summary on top / Expense Summary below + Net card, two donuts),
+> Categories endpoint, and **Goals** (single route `/goals.php`: On-going /
+> Completed card sections, card-state-machine actions). See §14 for what
+> remains deferred and §0 for session history.
 
 ---
 
-## 0. Session handoff — read me first (23 Oct 2026)
+## 0. Session handoff — read me first (grown 23–26 Oct 2026)
 
-For the agent picking this up: three sprints shipped today. The list of
-*what they were* doubles as the list of *what may surprise you*.
+For the agent picking this up: sprints 1–6 are the dated log of everything
+that shipped, newest at the bottom. The list of *what shipped* doubles as
+the list of *what may surprise you*. Start at **Sprint 6** (26 Oct) — it
+changed the most, then read **Current state at session end** below it.
 
 ### Sprint 1 — Summary route + categories
 - `/summary.php` (donut + breakdown) and `/categories.php` (POST-only JSON
@@ -61,6 +64,7 @@ For the agent picking this up: three sprints shipped today. The list of
 
 ### Sprint 4 — Goals route (24 Oct 2026)
 - `/goals.php` + `/goal-details.php` are LIVE; sidebar no longer shows SOON.
+  (Sprint 6 later removed `goal-details.php` — this bullet is the 24 Oct log.)
 - Design decision of record: **invest/take back write REAL transactions**
   (mode `-`/`+`, `goal = 1`, category `Goal Investment`, auto comment) +
   a signed `goal_investments` ledger row + the `goals.investment` aggregate,
@@ -89,30 +93,83 @@ For the agent picking this up: three sprints shipped today. The list of
   mode-unrestricted); comment rows render auto-expanded in the Goal tab
   because goal=1 can't name the goal — comments carry attribution
   ("Invested in <name>"). Per-goal ledger UI removed.
+- Summary tab split into Income Summary (top) / Expense Summary (bottom),
+  the Goals-style section convention: each with its own hand-rolled donut
+  ("Total Income" / "Total Expenses" centres, `--chart-1..8` tokens),
+  breakdown table (`stat-income` green / `stat-expense` red), and its own
+  empty state — both always render. Goal transfers included by the locked
+  24 Oct design (invest = expense side, take back = income side). A Net
+  card (income − expense, green/red by sign) closes the page — trial per
+  user request 26 Oct, keep/remove at their review. `expense_by_category()`
+  became mode-parameterised `sum_by_category()` (one shape, two calls).
+  Weekly/monthly checks + Sep-2026 empty path verified; no CSS change.
+  **Donut stacking regression fixed 26 Oct** (found via user screenshot
+  `income_donut_bug.png`): the inherited offset recursion double-negated on
+  every second slice, displacing small slices onto the main arc (read as a
+  "split ring") — replaced with an explicit cumulative walk
+  (`offset = -(length so far)`) plus last-slice compensation
+  (`length += circumference - cumulative`) so the ring always closes
+  exactly. Verified by asserting from the live DOM that offsets are
+  contiguous and `Σlength == circumference` for both donuts; Daily view
+  (1 slice) and the Sep-2026 empty month re-checked. Percentages render at
+  **fixed two decimals** (Summary Share column + donut arias; Goals cards'
+  progress text/bar/aria — `goal_share()` now returns a 2dp float) per
+  user request the same evening — e.g. Lottery 99.42%, micro shares like
+  Grocery 0.25% stay readable instead of flattening to 0%.
+- Tooltip polish (26 Oct): all card disabled-button hints upgraded from
+  native `title` to wrapper-span Bootstrap tooltips (CDP-verified hover +
+  hide); the completed goal's Delete tooltip worded "This goal is already
+  completed." like the card's other locked buttons (server matches), while
+  ongoing cards keep the funds reason. Edit disabled on completed cards
+  with the same server-side stop ("That goal is already completed.").
+- Infra fix (26 Oct): server timezone skew — XAMPP's stock
+  `date.timezone=Europe/Berlin` made PHP's "today" lag ~7h, so the pickers
+  showed yesterday between local midnight and ~7–8am. `/opt/lampp/etc/php.ini`
+  → `Asia/Manila` (both module + LAMPP CLI; MariaDB's `SYSTEM`/HKT was
+  already right), Apache restarted via sudo. Full story: §9 gotcha 3.
 - QA'd end-to-end through real POSTs (state machine matrix, blocked delete,
   complete flow with date, History Goal tab) and fully restored (drift 0).
+- **Git state (for the next agent)**: the human committed the Goals 2.0
+  work themselves (`8afdd20 finished implementing goals`); the Summary
+  split + donut fix + 2-decimal shares + this evening's fixes are
+  **uncommitted** in the working tree (`summary.php`, `model.php`,
+  `goals.php`, `docs.md` — plus the human's own `tasks.txt` edits and
+  `income_donut_bug.png`, which is the user's untracked bug screenshot,
+  theirs to keep or delete). Follow the human's commit convention — commit
+  their work only if asked.
 
 ### Current state at session end
-- DB baseline as of 26 Oct 2026: `transactions` 14 rows, `users` balance
-  199739, **balance drift 0** (the human re-categorized and edited rows over
-  the weekend — earlier snapshots said 13 rows / 199939; whatever you see,
-  trust the drift query, not historical numbers). `goals` 4 rows (Sample
-  Goal 4 shows the Completed path: 300/300), `goal_investments` 0 rows,
-  `PREDEFINED_CATEGORIES` now includes `Goal Investment`; a handful of
-  custom categories live in `users.categories` (Grocery, Lottery, Travel,
-  Dinner + the 8 migrated labels like "Sample Transaction #22", "Instant
-  Coffee"). Live edits like this are expected — snapshot the baseline
-  before QA cycles and restore exactly after.
-- Verified working: routes 200/302, donut math visually confirmed (1–3
-  slices), picker validation (errors for non-list dates/weeks/months +
-  future periods), History pagination carrying `view`/`week`/`month`/`year`/
-  `type`, full goal lifecycle QA'd through real POSTs (create → invest →
-  over-cap rejection → take back → auto-complete → edit → delete → cleanup,
-  balance restored to baseline, drift 0), formulas for QA testing in §11.
-- Test tooling: Node CDP harness at `/tmp/opencode/cdp-test.mjs` (Node 26
-  built-in WebSocket + headless chromium `--remote-debugging-port=9222`) was
-  used to click through the Add Category modal end-to-end. Copy it out of
-  /tmp if you want it versioned; /tmp does not survive reboots.
+- DB right now (26 Oct 2026 late): `transactions` 14 rows, `users` balance
+  199739, **balance drift 0** (the human re-categorizes and edits rows
+  between sessions — earlier snapshots said 13 rows / 199939; whatever you
+  see, trust the drift query, not historical numbers). `goals` 4 rows with
+  **Sample Goal 4 explicitly completed** (`completed=1, date_completed=
+  2026-10-26`, 300/300) — the Completed-card path is live data now, not a
+  fixture. `goal_investments` has **1 row** (net +200: the human invested
+  ₱200 in Sample Goal through the old 24–26 Oct detail flow) and its net
+  equals the net of `goal = 1` transactions — hand-check that equality via
+  the §15 goals-sanity query after any write-path change. The human kept
+  editing after that (Sample Goal 4's target went 300 → 310 → back to 300).
+  Live edits are expected — snapshot the baseline before QA cycles and
+  restore exactly after.
+- Verified working: routes 200/302 (goal-details 404), donut math asserted
+  from the served DOM (offsets contiguous, `Σlength == circumference`,
+  both donuts, Daily 1-slice case, empty month), 2-decimal share formats
+  every place percentages render (Summary Share column + donut arias,
+  Goals cards' progress text/bar/aria — `goal_share()` now returns a 2dp
+  float), tooltip hover/hide via CDP, picker validation (errors for non-
+  listed dates/weeks/months + future periods), History pagination carrying
+  `view`/`week`/`month`/`year`/`type`, full goal lifecycle QA'd through
+  real POSTs (create → invest → over-cap rejection → take back → complete
+  → frozen-card checks → delete-block → cleanup, balance restored to
+  baseline, drift 0). Formulas for QA testing in §11.
+- Test tooling: the CDP pattern is written as **`/tmp/opencode/hover-tip.mjs`**
+  (Node 26 built-in WebSocket → headless Chromium `--remote-debugging-port=
+  9222`: createTarget/attach → navigate → Runtime.evaluate + real mouse
+  events → screenshots). It currently hovers the blocked-delete tooltip and
+  is a reusable template for any hover/click/assertion check. **/tmp does
+  not survive reboots** and the older `cdp-test.mjs` is gone — copy what
+  you rely on to a versioned location if you want it kept.
 
 ---
 
@@ -314,7 +371,7 @@ originals failed AA as text.
 | `/dashboard.php` | done | balance card, week/month expense cards, goal count, recent 5 |
 | `/make-transactions.php` | done | "Make Transaction" (renamed 26 Oct 2026, ex update-balance.php). POST form → dashboard redirect; category picker + Add Category modal |
 | `/history.php` | done | shared period picker (All Time default + Daily/Week/Month), type filter, pagination, expandable comments |
-| `/summary.php` | done | Daily/Weekly/Monthly toggle, date picker, donut + breakdown table |
+| `/summary.php` | done | Daily/Weekly/Monthly toggle, date picker, sectioned Income (top) / Expense (bottom) summaries — each with its own donut + breakdown table — plus a Net (income − expense) card; goal transfers included in both |
 | `/categories.php` | done | JSON endpoint. POST `name=` → 201/400; GET → **405** |
 | `/goals.php` | done | goal list (On-going/Completed sections) + ALL actions on cards: invest, take back, complete (confirm modal), edit, delete (blocked while invested) |
 
@@ -345,7 +402,7 @@ truth:
   on a disabled "Choose a category…" placeholder; server-side
   `category_is_known()` rejects empty ("Category is required.") and unknown
   ("Choose a valid category.") picks. There is no "Uncategorized" path for
-  new rows — `expense_by_category()`'s NULLIF/COALESCE fallback stays only as
+  new rows — `sum_by_category()`'s NULLIF/COALESCE fallback stays only as
   dead-code defence.
 - **Write path**: a category is created only via `POST /categories.php`
   (dedicated endpoint, JSON response, GET → 405). The transaction-submit POST
@@ -407,7 +464,7 @@ tasks.txt + `goal-components/` mockups (26 Oct):
   | X < target | ✓ | ✓ | not shown |
   | 100% | disabled ("Target reached…") | ✓ | shown → confirm modal |
   | completed | disabled | disabled | gone |
-```
+
   (26 Oct revision: Edit is **also disabled** on a completed card and
   `goal_save` hard-stops it server-side — "That goal is already completed." —
   so a completed goal's target/name cannot be adjusted at all.)
@@ -594,7 +651,7 @@ rejected rather than silently rolling into March.
 
 ## 9. Bootstrap gotchas that already bit us
 
-These are the two that cost real debugging time. Both will recur.
+These are the three that cost real debugging time. All will recur.
 
 ### 1. `.card` is a flex container with `flex-direction: column`
 
@@ -622,6 +679,37 @@ Fix — scope to the element:
 .table td.stat-income { color: var(--income); }   /* (0,2,1) wins */
 ```
 
+### 3. Server clocks must agree: PHP timezone vs MariaDB (bit us 26 Oct 2026)
+
+The whole app's idea of "today" comes from PHP: every route builds
+`new DateTimeImmutable("today")`, and the shared period picker clamps its
+week/month options to PHP's today. SQL-side `CURDATE()`
+(`transactions.date` DEFAULT, `mark_goal_complete()`'s `date_completed`)
+uses MariaDB's own clock. If those two disagree, the pickers clamp to
+*yesterday* between local midnight and the moment the mis-configured zone
+crosses midnight — the user hit exactly this working 12am–4am Manila.
+
+Archaeology: XAMPP ships Germany-made defaults, so
+`/opt/lampp/etc/php.ini` had `date.timezone=Europe/Berlin` (+1/+2 with DST),
+while the system CLI PHP (`/etc/php/php.ini`, only used for
+lint/diagnostics) had none at all → UTC. MariaDB was never broken
+(`time_zone = SYSTEM` → OS zone HKT/+0800).
+
+**Fix applied 26 Oct**: `/opt/lampp/etc/php.ini` line 945 →
+`date.timezone=Asia/Manila`, then `sudo /opt/lampp/lampp restartapache`
+(the httpd master runs as root — this is the only step needing sudo).
+Verified: module reports `Asia/Manila`, `DateTimeImmutable("today")`
+matches MariaDB `NOW()`, newest date option = today.
+
+Symptom signature, if it ever regresses: date pickers show yesterday's day
+/ last week only, then "fix themselves" some hours after midnight.
+
+Known remainder: the **system CLI PHP still has no date.timezone** (reads
+UTC, `/etc/php/php.ini` is root-owned). It does not serve any page; if a
+future diagnostic says the CLI's "today" is stale, this is why — fix with
+`sudo sed -i 's/^;date.timezone =.*/date.timezone = Asia\/Manila/'
+/etc/php/php.ini`.
+
 Rule of thumb: **any colour/size override on a Bootstrap `.card` or `.table`
 child must be scoped to the element**, not applied to a bare class.
 
@@ -646,7 +734,9 @@ Single-account, university project, no auth by design. Still:
   `value=""`.
 - **All queries use prepared statements** with bound params. `mode`, `start`,
   `end`, `category` are bound; `LIMIT`/`OFFSET` are cast to `int` before
-  interpolation. The `GROUP BY` column in `expense_by_category()` is static SQL
+  interpolation. The `GROUP BY` column in `sum_by_category()` (26 Oct:
+  generalised from `expense_by_category()` with a bound `:mode` param —
+  Summary calls it once for income `+`, once for expenses `-`) is static SQL
   text, not user data.
 - The only interpolated SQL values are integers that have passed through
   `max()`/`(int)` casts, plus a table name checked against a hardcoded allowlist
@@ -751,10 +841,12 @@ adding before submission.
 4. **`transactions.goal` has no foreign key** and relies on `0` as a
    "not linked" sentinel. It is now actively written by the goal invest /
    take-back flows (always `1` on goal rows); still no FK by design.
-5. **No automated tests** — though the Summary build added a repeatable CDP
-   smoke-check pattern (Node 26's built-in WebSocket client driving headless
-   Chromium over DevTools protocol at `/tmp/opencode/cdp-test.mjs`; copy it
-   out of there if you want it versioned).
+5. **No automated tests** — but a repeatable CDP smoke-check file exists at
+   `/tmp/opencode/hover-tip.mjs` (Node 26's built-in WebSocket client
+   driving headless Chromium: createTarget/attach → navigate →
+   Runtime.evaluate + `Input.dispatchMouseEvent` hover/click → screenshot).
+   **/tmp dies on reboot** — copy it somewhere versioned if a test suite is
+   wanted; it is the working template for hover/click/DOM-assertion checks.
 6. **`users.categories` is a stop-gap**: it is really browser-localStorage
    data. When migrating, the client contract is already endpoint-shaped
    (read list on load, add via POST) — replace `categories.php` calls with

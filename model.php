@@ -487,16 +487,19 @@ function resolve_period(object $pdo, array $request, DateTimeImmutable $today, a
     ];
 }
 
-function expense_by_category(object $pdo, string $start, string $end){
+function sum_by_category(object $pdo, string $start, string $end, string $mode){
+    /* "+"/"-" only (validated by the callers); the GROUP BY column is static
+       SQL text, not user data. */
     $sql = "SELECT COALESCE(NULLIF(category, ''), 'Uncategorized') AS category,
                    SUM(amount) AS total
             FROM transactions
-            WHERE mode = '-'
+            WHERE mode = :mode
               AND date BETWEEN :start AND :end
             GROUP BY category
             ORDER BY total DESC, category ASC; ";
 
     $statement = $pdo -> prepare($sql);
+    $statement -> bindParam(":mode", $mode);
     $statement -> bindParam(":start", $start);
     $statement -> bindParam(":end", $end);
     $statement -> execute();
@@ -629,8 +632,10 @@ function goal_share(int $investment, int $targetAmount){
         return 0;
     }
 
-    $share = (int) floor($investment / $targetAmount * 100);
-    return max(0, min(100, $share));
+    /* Two-decimal precision so micro shares stay visible (26 Oct request);
+       callers format with number_format(..., 2). */
+    $share = round($investment / $targetAmount * 100, 2);
+    return max(0.0, min(100.0, $share));
 }
 
 /* Invest ("-" mode) or take back ("+" mode) for one goal, atomically:

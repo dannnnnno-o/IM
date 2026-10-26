@@ -326,11 +326,11 @@ require_once("./partials/sidebar.php");
 
                                 <div class="progress mb-1" role="progressbar"
                                      aria-label="Progress toward <?= htmlspecialchars((string) $goal["name"]) ?>"
-                                     aria-valuenow="<?= $share ?>" aria-valuemin="0" aria-valuemax="100"
+                                     aria-valuenow="<?= number_format($share, 2) ?>" aria-valuemin="0" aria-valuemax="100"
                                      style="height: 8px;">
-                                    <div class="progress-bar" style="width: <?= $share ?>%; background: var(<?= ($isCompleted || $isFull) ? "--balance-accent" : "--brand" ?>);"></div>
+                                    <div class="progress-bar" style="width: <?= number_format($share, 2) ?>%; background: var(<?= ($isCompleted || $isFull) ? "--balance-accent" : "--brand" ?>);"></div>
                                 </div>
-                                <div class="tiny text-muted mb-3"><?= peso($investment) ?> of <?= peso($target) ?> &middot; <?= $share ?>%</div>
+                                <div class="tiny text-muted mb-3"><?= peso($investment) ?> of <?= peso($target) ?> &middot; <?= number_format($share, 2) ?>%</div>
 
                                 <div class="d-flex flex-wrap gap-2 mt-auto">
                                     <span <?= $investDisabled ? 'data-bs-toggle="tooltip" data-bs-placement="top" title="' . $investHint . '"' : "" ?>>

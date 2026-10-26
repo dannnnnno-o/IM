@@ -65,7 +65,7 @@ Goal
     same table layout as the current transactions table will be used to display the results.
 
     This will remove the goal-ledgers on each goals.
-    
+
 2. Adjust Goal Card
     on-going state where `y = target amount`: 
         ₱0: Invest (available), Take Back (unavailable), Complete (unavailable + not shown)
@@ -82,3 +82,14 @@ Goal
 4. Remove goal-details.php as every buttons will be available on the goal-card itself
 
 5. Separate Completed Goals from On-going goals
+
+
+
+Finishing Tasks
+1. Check for time-related issues.
+2. Clear out tables and populate with something more sensible
+3. Adjust Summary Tab to include income chart
+4. Landing page (first visit, user gets prompted for name) 
+
+Optionals (recommended, actually)
+1. Archive + soft-delete for goals.
