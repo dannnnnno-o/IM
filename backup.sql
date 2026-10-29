@@ -92,7 +92,7 @@ CREATE TABLE `goals` (
   `completed` int(1) NOT NULL DEFAULT 0,
   `date_completed` date DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -123,7 +123,7 @@ CREATE TABLE `transactions` (
   `goal` int(1) NOT NULL DEFAULT 0,
   `comment` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -133,10 +133,6 @@ CREATE TABLE `transactions` (
 SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 LOCK TABLES `transactions` WRITE;
 /*!40000 ALTER TABLE `transactions` DISABLE KEYS */;
-INSERT INTO `transactions` VALUES
-(1,'2026-10-26',181,'+','Allowance',0,'Current Balance for 10/26/2026'),
-(2,'2026-10-26',500,'+','QA Test',0,NULL),
-(3,'2026-10-26',200,'-','QA Test',0,NULL);
 /*!40000 ALTER TABLE `transactions` ENABLE KEYS */;
 UNLOCK TABLES;
 COMMIT;
@@ -154,6 +150,9 @@ CREATE TABLE `users` (
   `balance` int(11) NOT NULL,
   `username` varchar(50) NOT NULL,
   `categories` varchar(2500) DEFAULT NULL,
+  `category_overrides` varchar(2500) NOT NULL DEFAULT '{}',
+  `skip_rename_confirm` tinyint(1) NOT NULL DEFAULT 0,
+  `skip_remove_confirm` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -166,7 +165,7 @@ SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
 INSERT INTO `users` VALUES
-(1,481,'QA Pass','[\"Allowance\",\"QA Test\"]');
+(1,0,'','[]','{}',0,0);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 COMMIT;
@@ -181,4 +180,4 @@ SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2026-10-26 13:05:24
+-- Dump completed on 2026-10-30  1:16:51
