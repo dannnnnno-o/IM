@@ -42,11 +42,18 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
     elseif(!ctype_digit($form["amount"]) || (int) $form["amount"] <= 0){
         $errors[] = "Amount must be a whole positive number.";
     }
-    elseif(strlen($form["amount"]) > 10 || (int) $form["amount"] > 2147483647){
+    elseif(strlen($form["amount"]) > 10 || (int) $form["amount"] > MAX_AMOUNT){
         $errors[] = "Amount is too large.";
     }
     else{
         $amount = (int) $form["amount"];
+
+        /* users.balance is int(11): an income that pushes it past MAX_AMOUNT
+           makes the cached-balance UPDATE overflow and crash the page. */
+        if($mode === "+" && $amount > MAX_AMOUNT - (int) $user["balance"]){
+            $errors[] = "Amount exceeds the balance cap.";
+            $amount = null;
+        }
     }
 
     /* Balance floor (27 Oct): an expense cannot exceed the money on hand —

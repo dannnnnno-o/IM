@@ -1,5 +1,17 @@
 <script src="/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
+/* Double-submit guard. Document-level and bubble-phase, so it runs after any
+   form-level handler; a page that cancelled the submit (index.php's confirm
+   modal) is detected via defaultPrevented and left alone. */
+document.addEventListener("submit", function(event){
+    if(event.defaultPrevented){ return; }
+
+    event.target.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(function(button){
+        button.disabled = true;
+    });
+});
+</script>
+<script>
 /* Auto-dismiss flash alerts (Sprint 13, 29 Oct 2026): success flashes carry
    .alert-dismissible; error alerts (alert-danger, no dismiss button, house
    pattern) are deliberately NOT in scope and stay until dismissed by hand.

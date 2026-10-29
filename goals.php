@@ -54,7 +54,7 @@ function goal_amount_error(string $input){
     if(!ctype_digit($input) || (int) $input <= 0){
         return "Amount must be a whole positive number.";
     }
-    if(strlen($input) > 10 || (int) $input > 2147483647){
+    if(strlen($input) > 10 || (int) $input > MAX_AMOUNT){
         return "Amount is too large.";
     }
     return null;
@@ -191,6 +191,10 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
             if($action === "takeback"){
                 if(empty($errors) && (int) $amountInput > (int) $goal["investment"]){
                     $errors[] = "You can take back at most " . peso((int) $goal["investment"]) . ".";
+                }
+                elseif(empty($errors) && (int) $amountInput > MAX_AMOUNT - (int) $user["balance"]){
+                    /* A take-back adds to the cached balance — same ceiling as income. */
+                    $errors[] = "Amount is too large.";
                 }
             }
             elseif(empty($errors) && (int) $goal["investment"] >= (int) $goal["target_amount"]){

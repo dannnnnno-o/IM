@@ -22,6 +22,11 @@ const MAX_CATEGORY_NAME_LENGTH = 30;
    users.username column width (varchar(50)); enforced before save_username(). */
 const MAX_USERNAME_LENGTH = 50;
 
+/* Signed-INT ceiling for the money columns (users.balance, transactions.amount,
+   goals.target_amount/investment are all int(11)). Guards the cached-balance
+   UPDATE against SQLSTATE 22003 "out of range". */
+const MAX_AMOUNT = 2147483647;
+
 function get_custom_categories(object $pdo, int $userId){
     $sql = "SELECT categories FROM users WHERE id = :id; ";
 
