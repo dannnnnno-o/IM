@@ -146,7 +146,6 @@ require_once("./partials/sidebar.php");
                             <div class="d-flex align-items-center justify-content-between">
                                 <label class="form-label" for="category">Category</label>
                                 <span class="d-flex align-items-center gap-3">
-                                    <a href="/settings.php#manage-categories" class="btn-add-category text-decoration-none">Manage Categories</a>
                                     <button type="button" class="btn-add-category" data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add Category</button>
                                 </span>
                             </div>
@@ -189,7 +188,7 @@ require_once("./partials/sidebar.php");
                     <form id="addCategoryForm" novalidate>
                         <div class="mb-3">
                             <label class="form-label" for="newCategoryName">Category Name</label>
-                            <input type="text" class="form-control" id="newCategoryName"
+                            <input type="text" autocomplete="off" class="form-control" id="newCategoryName"
                                    maxlength="30" placeholder="e.g. School, Savings, etc.">
                             <div class="form-text"><span id="newCategoryCount">0</span>/30 characters</div>
                         </div>
@@ -203,6 +202,7 @@ require_once("./partials/sidebar.php");
                             <div class="form-text">Controls which transaction modes can use this category.</div>
                         </div>
                         <div id="addCategoryError" class="alert alert-danger py-2 mb-0 d-none" role="alert"></div>
+                        <a href="/settings.php#manage-categories" class="btn-add-category text-decoration-none">Manage Categories</a>
                     </form>
                 </div>
                 <div class="modal-footer">
