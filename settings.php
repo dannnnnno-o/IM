@@ -60,6 +60,16 @@ $hasCustomCategories = count($customCategories) > 0;
    drives the section table; read-only by default, Edit toggles ON. Types
    that came from overrides or customs are already merged in here. */
 $managedCategories = category_type_map($pdo, $userId);
+$predefinedCategories = [];
+$userCategories = [];
+foreach($managedCategories as $name => $type){
+    if(isset(PREDEFINED_PICKABLE_CATEGORIES[$name])){
+        $predefinedCategories[$name] = $type;
+    }
+    else{
+        $userCategories[$name] = $type;
+    }
+}
 
 /* "Do not show this again" flags live in the users row (user decision —
    no browser storage); read once, mirrored into data-attributes for the
@@ -185,75 +195,133 @@ require_once("./partials/sidebar.php");
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h2 class="h5 mb-0">Manage Categories</h2>
-                <button type="button" class="btn-add-category" id="mcEditBtn">Edit</button>
+                <div class="d-flex align-items-center gap-3">
+                    <button type="button" class="btn btn-primary" id="mcAddCategoryBtn"
+                            data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add Category</button>
+                    <button type="button" class="btn btn-outline-primary" id="mcEditBtn">Edit</button>
+                </div>
             </div>
 
-            <table class="table align-middle mb-3" id="mcTable">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th class="text-center" style="width:6em;">Income</th>
-                        <th class="text-center" style="width:6em;">Expense</th>
-                        <th class="text-end" style="width:6em;">&nbsp;</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach($managedCategories as $mcName => $mcType):
-                        $mcCustom = !isset(PREDEFINED_PICKABLE_CATEGORIES[$mcName]);
-                        $mcIncome = $mcType === CATEGORY_INCOME || $mcType === CATEGORY_BOTH;
-                        $mcExpense = $mcType === CATEGORY_EXPENSE || $mcType === CATEGORY_BOTH;
-                    ?>
-                    <tr data-category="<?= htmlspecialchars($mcName) ?>"
-                        data-custom="<?= $mcCustom ? "1" : "0" ?>">
-                        <td class="mc-name"><?= htmlspecialchars($mcName) ?></td>
-                        <td class="text-center">
-                            <input class="form-check-input mc-type" type="checkbox"
-                                   data-kind="income" <?= $mcIncome ? "checked" : "" ?> disabled>
-                        </td>
-                        <td class="text-center">
-                            <input class="form-check-input mc-type" type="checkbox"
-                                   data-kind="expense" <?= $mcExpense ? "checked" : "" ?> disabled>
-                        </td>
-                        <td class="text-end">
-                            <?php if($mcCustom): ?>
-                                <button type="button" class="mc-icon-btn mc-rename" disabled
-                                        aria-label="Rename category" title="Rename category">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5.2 2.6a.5.5 0 0 1-.63-.63l2.6-5.2a.5.5 0 0 1 .11-.168l10-10zM11.207 2.791l1.585 1.585 1.086-1.086-1.586-1.585-1.085 1.086zm1.985 2.798-2.553-2.553L4 9.586V12h2.414L13.192 5.589z"/></svg>
-                                </button>
-                                <button type="button" class="mc-icon-btn mc-remove text-danger" disabled
-                                        aria-label="Remove category" title="Remove category">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                                </button>
-                            <?php else: ?>
-                                <!-- Disabled buttons emit no hover, so the wrapper
-                                     span carries the tooltip (§6c pattern family). -->
-                                <span class="d-inline-block"
-                                      data-bs-toggle="tooltip" data-bs-placement="top"
-                                      title="Built-in categories can't be renamed or removed.">
-                                    <button type="button" class="mc-icon-btn" disabled
-                                            aria-label="Rename category">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5.2 2.6a.5.5 0 0 1-.63-.63l2.6-5.2a.5.5 0 0 1 .11-.168l10-10zM11.207 2.791l1.585 1.585 1.086-1.086-1.586-1.585-1.085 1.086zm1.985 2.798-2.553-2.553L4 9.586V12h2.414L13.192 5.589z"/></svg>
-                                    </button>
-                                    <button type="button" class="mc-icon-btn" disabled
-                                            aria-label="Remove category">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                                    </button>
-                                </span>
+            <div class="row g-4" id="mcTable">
+                <?php foreach([
+                    "Predefined Categories" => [$predefinedCategories, false],
+                    "User-Added Categories" => [$userCategories, true],
+                ] as $groupTitle => [$categoryGroup, $mcCustom]): ?>
+                    <div class="col-md-6">
+                        <div class="h-100 border rounded p-3">
+                            <div class="border-bottom pb-2 mb-2">
+                                <h3 class="h6 mb-1"><?= $groupTitle ?></h3>
+                                <p class="text-muted small mb-0">
+                                    <?= $mcCustom
+                                        ? "Categories you have added. "
+                                        : "Built-in categories available by default." ?>
+                                </p>
+                            </div>
+                            <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th class="text-center" style="width:6em;">Income</th>
+                                    <th class="text-center" style="width:6em;">Expense</th>
+                                    <th class="text-end" style="width:6em;">&nbsp;</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($categoryGroup as $mcName => $mcType):
+                                    $mcIncome = $mcType === CATEGORY_INCOME || $mcType === CATEGORY_BOTH;
+                                    $mcExpense = $mcType === CATEGORY_EXPENSE || $mcType === CATEGORY_BOTH;
+                                ?>
+                                <tr data-category="<?= htmlspecialchars($mcName) ?>"
+                                    data-custom="<?= $mcCustom ? "1" : "0" ?>">
+                                    <td class="mc-name"><?= htmlspecialchars($mcName) ?></td>
+                                    <td class="text-center">
+                                        <input class="form-check-input mc-type" type="checkbox"
+                                               data-kind="income" <?= $mcIncome ? "checked" : "" ?> disabled>
+                                    </td>
+                                    <td class="text-center">
+                                        <input class="form-check-input mc-type" type="checkbox"
+                                               data-kind="expense" <?= $mcExpense ? "checked" : "" ?> disabled>
+                                    </td>
+                                    <td class="text-end">
+                                        <?php if($mcCustom): ?>
+                                            <button type="button" class="mc-icon-btn mc-rename" disabled
+                                                    aria-label="Rename category" title="Rename category">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5.2 2.6a.5.5 0 0 1-.63-.63l2.6-5.2a.5.5 0 0 1 .11-.168l10-10zM11.207 2.791l1.585 1.585 1.086-1.086-1.586-1.585-1.085 1.086zm1.985 2.798-2.553-2.553L4 9.586V12h2.414L13.192 5.589z"/></svg>
+                                            </button>
+                                            <button type="button" class="mc-icon-btn mc-remove text-danger" disabled
+                                                    aria-label="Remove category" title="Remove category">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                                            </button>
+                                        <?php else: ?>
+                                            <span class="d-inline-block"
+                                                  data-bs-toggle="tooltip" data-bs-placement="top"
+                                                  title="Built-in categories can't be renamed or removed.">
+                                                <button type="button" class="mc-icon-btn" disabled
+                                                        aria-label="Rename category">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5.2 2.6a.5.5 0 0 1-.63-.63l2.6-5.2a.5.5 0 0 1 .11-.168l10-10zM11.207 2.791l1.585 1.585 1.086-1.086-1.586-1.585-1.085 1.086zm1.985 2.798-2.553-2.553L4 9.586V12h2.414L13.192 5.589z"/></svg>
+                                                </button>
+                                                <button type="button" class="mc-icon-btn" disabled
+                                                        aria-label="Remove category">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                                                </button>
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                            </table>
+                            <?php if($mcCustom && empty($categoryGroup)): ?>
+                                <p class="text-muted small mt-2 mb-0">No user-added categories yet. Add one?</p>
                             <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
 
             <div class="alert alert-danger py-2 mb-3 d-none" id="mcTypeError" role="alert"></div>
 
-            <div class="d-flex justify-content-end gap-2 d-none" id="mcEditActions">
+            <div class="mt-4 d-flex justify-content-end gap-2 d-none" id="mcEditActions">
                 <button type="button" class="btn btn-outline-secondary" id="mcCancel">Cancel</button>
                 <button type="button" class="btn btn-primary" id="mcSave">Save Changes</button>
             </div>
         </div>
     </section>
+
+    <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="addCategoryLabel">Add Category</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addCategoryForm" novalidate>
+                        <div class="mb-3">
+                            <label class="form-label" for="newCategoryName">Category Name</label>
+                            <input type="text" autocomplete="off" class="form-control" id="newCategoryName"
+                                   maxlength="<?= MAX_CATEGORY_NAME_LENGTH ?>" placeholder="e.g. School, Savings, etc.">
+                            <div class="form-text"><span id="newCategoryCount">0</span>/<?= MAX_CATEGORY_NAME_LENGTH ?> characters</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="newCategoryType">Type</label>
+                            <select class="form-select" id="newCategoryType">
+                                <option value="expense">Expense</option>
+                                <option value="income" selected>Income</option>
+                                <option value="both">Both</option>
+                            </select>
+                            <div class="form-text">Controls which transaction modes can use this category.</div>
+                        </div>
+                        <div id="addCategoryError" class="alert alert-danger py-2 mb-0 d-none" role="alert"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveCategory">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Danger Zone: the two destructive actions. Details + confirmation
          live in the modals below (counts interpolated server-side). -->
@@ -494,6 +562,7 @@ require_once("./partials/sidebar.php");
     (function(){
         var section   = document.getElementById("manage-categories");
         var editBtn   = document.getElementById("mcEditBtn");
+        var addBtn    = document.getElementById("mcAddCategoryBtn");
         var saveBtn   = document.getElementById("mcSave");
         var cancelBtn = document.getElementById("mcCancel");
         var editRow   = document.getElementById("mcEditActions");
@@ -543,6 +612,7 @@ require_once("./partials/sidebar.php");
 
             editRow.classList.remove("d-none");
             editBtn.disabled = true;
+            if(addBtn){ addBtn.disabled = true; }
             hideTypeError();
         });
 
@@ -565,6 +635,7 @@ require_once("./partials/sidebar.php");
 
             editRow.classList.add("d-none");
             editBtn.disabled = false;
+            if(addBtn){ addBtn.disabled = false; }
             hideTypeError();
         };
 
@@ -780,17 +851,14 @@ require_once("./partials/sidebar.php");
         var removeSkip      = document.getElementById("removeSkipCheck");
         var removeProceed   = document.getElementById("removeProceed");
 
-        var applyRemoveSuccess = function(name, flagWasChecked){
+        var applyRemoveSuccess = function(flagWasChecked){
             var modal = bootstrap.Modal.getInstance(removeModalEl);
             if(modal){ modal.hide(); }
-
-            table.querySelectorAll("tbody tr").forEach(function(row){
-                if(rowName(row) === name){ row.remove(); }
-            });
 
             if(flagWasChecked){
                 section.setAttribute("data-skip-remove", "1");
             }
+            window.location.reload();
         };
 
         var performRemove = function(name, flagWasChecked){
@@ -811,7 +879,7 @@ require_once("./partials/sidebar.php");
                         bootstrap.Modal.getOrCreateInstance(removeModalEl).show();
                         return;
                     }
-                    applyRemoveSuccess(name, flagWasChecked);
+                    applyRemoveSuccess(flagWasChecked);
                 })
                 .catch(function(){
                     removeError.textContent = "Could not reach the server. Try again.";
@@ -825,6 +893,74 @@ require_once("./partials/sidebar.php");
 
         removeProceed.addEventListener("click", function(){
             performRemove(document.getElementById("removeLabel").textContent, removeSkip.checked);
+        });
+    })();
+    </script>
+
+    <script>
+    (function(){
+        var addForm = document.getElementById("addCategoryForm");
+        var nameBox = document.getElementById("newCategoryName");
+        var nameCount = document.getElementById("newCategoryCount");
+        var typeSelect = document.getElementById("newCategoryType");
+        var saveButton = document.getElementById("saveCategory");
+        var errorBox = document.getElementById("addCategoryError");
+        var modalEl = document.getElementById("addCategoryModal");
+
+        if(!addForm || !nameBox || !nameCount || !typeSelect || !saveButton || !errorBox || !modalEl){
+            return;
+        }
+
+        nameBox.addEventListener("input", function(){
+            nameCount.textContent = Array.from(nameBox.value).length;
+        });
+
+        var showError = function(message){
+            errorBox.textContent = message;
+            errorBox.classList.remove("d-none");
+        };
+
+        addForm.addEventListener("submit", function(event){
+            event.preventDefault();
+            saveButton.click();
+        });
+
+        saveButton.addEventListener("click", function(){
+            var name = nameBox.value.trim();
+            if(name === ""){
+                showError("Category name is required.");
+                return;
+            }
+
+            saveButton.disabled = true;
+            errorBox.classList.add("d-none");
+
+            var payload = new FormData();
+            payload.append("name", name);
+            payload.append("type", typeSelect.value);
+
+            fetch("/categories.php", { method: "POST", body: payload })
+                .then(function(response){
+                    return response.json().then(function(data){
+                        return { status: response.status, data: data };
+                    });
+                })
+                .then(function(result){
+                    if(!result.data || result.data.ok !== true){
+                        showError((result.data && result.data.error) || "Could not add the category.");
+                        return;
+                    }
+
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if(modal){ modal.hide(); }
+                    window.location.reload();
+                })
+                .catch(function(){
+                    showError("Could not reach the server. Try again.");
+                })
+                .finally(function(){
+                    saveButton.disabled = false;
+                });
         });
     })();
     </script>
