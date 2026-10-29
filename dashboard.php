@@ -114,7 +114,7 @@ require_once("./partials/sidebar.php");
                             $goal_msg = "Keep working towards your <a style=\"text-decoration: none;\" href=\"/goals.php\">goal</a> :>";
                             break;
                         default: 
-                            $goal_msg = "Keep working toward your <a style=\"text-decoration: none;\" href=\"/goals.php\"goals</a> :>";
+                            $goal_msg = "Keep working toward your <a style=\"text-decoration: none;\" href=\"/goals.php\">goals</a> :>";
                             break;
                     }
                     echo $goal_msg;
