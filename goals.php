@@ -450,7 +450,7 @@ require_once("./partials/sidebar.php");
                                    value="<?= htmlspecialchars($investAmount) ?>">
                         </div>
 
-                        <div class="form-text mb-0">This amount will be added as investment on this goal and will be deducted from your balance.</div>
+                        <div class="form-text mb-0">This amount will be added as investment on this goal and will be deducted from your balance. <br><br> Your current balance is: <?php echo peso((int) $user["balance"]) ?></div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

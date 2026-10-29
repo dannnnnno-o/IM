@@ -76,8 +76,7 @@ $reopenGoalModal = !empty($reopenGoalModal);
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0">Delete <strong id="goalDeleteName"></strong>? This removes the goal and its
-                    investment ledger. Transactions already recorded through investing stay in your history.</p>
+                <p class="mb-0">Delete <strong id="goalDeleteName"></strong>? This cannot be undone.</p>
             </div>
             <div class="modal-footer">
                 <form method="post" action="<?= htmlspecialchars($goalModalAction) ?>">
