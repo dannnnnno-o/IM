@@ -69,7 +69,7 @@ require_once("./partials/header.php");
                 </div>
             <?php endif; ?>
 
-            <form method="post" action="/" id="landingForm" novalidate>
+            <form method="post" action="/" novalidate>
                 <div class="mb-3">
                     <label class="form-label" for="name">Your name</label>
                     <div class="landing-input-wrap">
@@ -84,77 +84,11 @@ require_once("./partials/header.php");
                                autocomplete="off" autofocus>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100" id="confirmNameButton">Confirm</button>
+                <button type="submit" class="btn btn-primary w-100">Confirm</button>
             </form>
 
         </div>
     </section>
-
-    <!-- Confirm-before-lock step (mockup: landing-page.png): the name cannot
-         be renamed through the app once saved, so the user sees the exact
-         value that is about to be locked in. -->
-    <div class="modal fade" id="confirmNameModal" tabindex="-1" aria-labelledby="confirmNameTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title h5" id="confirmNameTitle">J-Budget</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <p class="mb-0">Note that at this part of development, the name cannot be changed yet.
-                    Proceed with the name <strong id="confirmNameValue"></strong>?</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Go Back</button>
-                    <button type="button" class="btn btn-primary" id="proceedName">Proceed</button>
-                </div>
-            </div>
-        </div>
-    </div>
 </main>
-
-<script>
-(function(){
-    /* The Bootstrap bundle loads after page scripts (footer.php), so any
-       bootstrap.* access must wait for DOMContentLoaded — the same house
-       pattern the goals pages use for tooltips and modal re-openers. */
-    document.addEventListener("DOMContentLoaded", function(){
-        var form = document.getElementById("landingForm");
-        var nameInput = document.getElementById("name");
-        var valueEl = document.getElementById("confirmNameValue");
-        var modalEl = document.getElementById("confirmNameModal");
-        var proceedButton = document.getElementById("proceedName");
-
-        if(!form || !nameInput || !valueEl || !modalEl || !proceedButton){
-            return;
-        }
-
-        form.addEventListener("submit", function(event){
-            // Nothing to confirm — let the server render "Name is required."
-            if(nameInput.value.trim() === ""){
-                return;
-            }
-
-            event.preventDefault();
-
-            /* textContent, never innerHTML — the value is user input and must
-               land in the modal as plain text, not markup. The stored name is
-               htmlspecialchars()-escaped server-side as usual. */
-            valueEl.textContent = nameInput.value.trim();
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
-        });
-
-        proceedButton.addEventListener("click", function(){
-            proceedButton.disabled = true;
-            form.submit();      // real navigation POST, bypasses the listener above
-        });
-
-        // Go Back / Esc / close: leave the form ready for a second attempt.
-        modalEl.addEventListener("hidden.bs.modal", function(){
-            proceedButton.disabled = false;
-        });
-    });
-})();
-</script>
 
 <?php require_once("./partials/footer.php"); ?>
