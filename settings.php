@@ -130,11 +130,10 @@ require_once("./partials/sidebar.php");
     <?php endif; ?>
 
     <?php if(!empty($errors)): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger" role="alert">
             <?php foreach($errors as $settingsError): ?>
                 <div><?= htmlspecialchars($settingsError) ?></div>
             <?php endforeach; ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
 

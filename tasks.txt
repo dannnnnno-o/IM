@@ -93,3 +93,7 @@ Finishing Tasks
 
 Optionals (recommended, actually)
 1. Archive + soft-delete for goals.
+
+
+1. Fading notifications after a certain period of time
+2. Custom Categories management

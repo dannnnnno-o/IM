@@ -19,7 +19,9 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 > single-row snap-scroll strip, and the dead Logout strip was removed.
 > Sprint 12 (29 Oct) shipped the **Settings tab**: in-product rename,
 > "Clear data & reset balance" (optional custom-category wipe), and a
-> factory-reset "Delete account" — see §6, §8 and Sprint 12 below. The DB was wiped and re-seeded
+> factory-reset "Delete account" — see §6, §8 and Sprint 12 below. Sprint
+> 13 (29 Oct) made the success flash notifications fade away automatically
+> after 5s while validation errors stay persistent. The DB was wiped and re-seeded
 > fresh 26 Oct, then loaded with the
 > human's real demo data — see the Sprint 7/9 state notes. See §14 for
 > what remains deferred and §0 for session history.
@@ -28,12 +30,12 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
 ## 0. Session handoff — read me first (grown 23–26 Oct 2026)
 
-For the agent picking this up: sprints 1–11 are the dated log of everything
+For the agent picking this up: sprints 1–13 are the dated log of everything
 that shipped, newest at the bottom. The list of *what shipped* doubles as
-the list of *what may surprise you*. Start at **Sprint 11** (responsive
-pass), then **Sprint 10**, then **Sprint 9**, then **Sprints 6–8**
-(26–27 Oct) — they changed the most — then read **Current state at session
-end** below it.
+the list of *what may surprise you*. Start at **Sprint 13**, then
+**Sprint 12** (Settings tab), then **Sprint 11** (responsive pass), then
+**Sprint 9–10**, then **Sprints 6–8** (26–27 Oct), then read **Current
+state at session end** below it.
 
 **House workflow (applies every session)**: this file is the handoff — read
 it *instead of* re-reading the whole codebase; grep only the files you are
@@ -449,6 +451,40 @@ session can again restore context from this file alone.
   wiped via the new Settings flows themselves (counts 0/0/0, drift 0,
   sanity 0 = 0, categories `["Allowance"]`). All live-state readouts must
   come from §15 queries, as stated above.
+
+### Sprint 13 — Auto-dismissing flash alerts (29 Oct 2026, newest)
+- Presentation-only change in `partials/footer.php` (one inline `<script>`
+  after the bundle): every `.alert-dismissible` alert fades away
+  automatically after **5s** (`ALERT_AUTO_DISMISS_MS`, the single tuning
+  knob) via `bootstrap.Alert.getOrCreateInstance(el).close()`. No route,
+  model or validation change; **no CSS change — CSS_VERSION stays
+  `20261029-1`**. Success flashes on dashboard (`?saved=income/expense`),
+  goals (`?saved=…`) and settings (`?saved=profile` / `cleared`) are all
+  covered by the one snippet, riding the alerts' existing `.fade`
+  transition (~150ms) — a fade-out, not a pop.
+- **Errors started out persistent by design** (user decision, re-confirmed
+  29 Oct after the fading variant was built and reverted): validation-error
+  alerts use the house pattern `<div class="alert alert-danger">` without
+  `alert-dismissible`, so the selector alone enforces the success-only
+  scope with zero branching. settings.php's error banner was normalized to
+  that house pattern (it briefly carried a × + `alert-dismissible`, which
+  would have auto-faded the "Name is required." family).
+  (A same-evening variant that gave error banners × + an 8s auto-fade was
+  trialed and **reverted to the persistent house pattern** at the user's
+  request — errors stay until dismissed/re-rendered. Level of record.)
+- **Two Bootstrap mechanics of record**: (1) an alert that merely rendered
+  has NO `Alert` instance — instances materialize lazily on dismiss clicks
+  — so `getInstance()` + null-guard skipped every timer on the first try
+  (nothing ever dismissed) and `getOrCreateInstance().close()` is the
+  correct call; (2) an early manual close cannot be resurrected by the
+  late timer because `close()` REMOVES the node — a late call on the
+  detached element is an invisible no-op.
+- QA is a CDP timing matrix (curl cannot see timers;
+  `settings-flash.mjs` + `flash-sweep.mjs` in /tmp, mortal): flash present
+  at ~1.5s and **removed from the DOM by ~6.5s** on
+  settings/goals/dashboard; the POST blank-rename error alert still
+  readable verbatim past 6.2s; manual close at 1.3s → node detached,
+  page clean at 6s. §15 route smoke re-run clean.
 
 ### Current state at session end
 - DB right now (**29 Oct 2026, after Sprint 11**): `users` id=1 — username
