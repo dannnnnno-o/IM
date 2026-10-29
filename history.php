@@ -86,7 +86,7 @@ require_once("./partials/sidebar.php");
     <div class="card">
         <div class="card-body">
 
-            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                 <?php require_once("./partials/period-picker.php"); ?>
 
                 <form method="get" action="/history.php" id="typeForm" class="d-flex align-items-center gap-2">

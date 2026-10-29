@@ -30,10 +30,21 @@ $navItems = [
             <?php endif; ?>
         <?php endforeach; ?>
     </nav>
-
-    <div class="sidebar-foot">
-        <span class="nav-link is-disabled" aria-disabled="true">
-            <span class="nav-label">Logout</span>
-        </span>
-    </div>
 </aside>
+<script>
+(function(){
+    /* Mobile topbar: with the nav items on one nowrap row, the current page's
+       chip can end up outside the visible strip (e.g. Summary at 414px).
+       Snap it into view on load — inline-center scrolls horizontally only,
+       block-nearest keeps the page from jumping vertically. */
+    var active = document.querySelector(".sidebar-nav .nav-link.is-active");
+    if(active && active.scrollIntoView){
+        try{
+            active.scrollIntoView({inline: "center", block: "nearest", behavior: "auto"});
+        }
+        catch(error){
+            active.scrollIntoView(false);
+        }
+    }
+})();
+</script>

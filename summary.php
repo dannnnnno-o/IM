@@ -106,7 +106,7 @@ require_once("./partials/sidebar.php");
     </header>
 
     <div class="card mb-4">
-        <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div class="card-body d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
             <?php require_once("./partials/period-picker.php"); ?>
         </div>
     </div>
@@ -132,7 +132,7 @@ require_once("./partials/sidebar.php");
             </div>
         <?php else: ?>
             <div class="row g-3 mb-4">
-                <div class="col-md-5">
+                <div class="col-lg-5">
                     <div class="card h-100">
                         <div class="card-body d-flex flex-column align-items-center justify-content-center">
                             <svg class="donut-chart" viewBox="0 0 210 210" role="img"
@@ -152,7 +152,7 @@ require_once("./partials/sidebar.php");
                     </div>
                 </div>
 
-                <div class="col-md-7">
+                <div class="col-lg-7">
                     <div class="card h-100">
                         <div class="card-body">
                             <div class="table-responsive">

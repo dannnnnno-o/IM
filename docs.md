@@ -5,7 +5,7 @@ Information Management project. Submitted by **Daniel Z. Baladad**.
 
 Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
-> Last updated: **27 Oct 2026 (evening)** · Status: **Every feature from the
+> Last updated: **29 Oct 2026 (evening)** · Status: **Every feature from the
 > proposal is live**: the **Landing page** (first-visit name prompt,
 > Sprints 7–8) at `/`, Dashboard (Sprint 9: today-only income/expense
 > stat cards + "Set a goal" deep link), "Make Transaction" (Sprint 10:
@@ -14,7 +14,11 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 > Summary on top / Expense Summary below + Net card, two donuts),
 > Categories endpoint, and **Goals** (single route `/goals.php`: On-going /
 > Completed card sections, card-state-machine actions; invest floor in
-> §8). The DB was wiped and re-seeded fresh 26 Oct, then loaded with the
+> §8). Sprint 11 (29 Oct) added the **responsive pass**: pickers and the
+> Summary split hold to real breakpoints, the mobile topbar is a
+> single-row snap-scroll strip, and the dead Logout strip was removed
+> (settings tab planned in its place). The DB was wiped and re-seeded
+> fresh 26 Oct, then loaded with the
 > human's real demo data — see the Sprint 7/9 state notes. See §14 for
 > what remains deferred and §0 for session history.
 
@@ -22,11 +26,19 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
 ## 0. Session handoff — read me first (grown 23–26 Oct 2026)
 
-For the agent picking this up: sprints 1–7 are the dated log of everything
+For the agent picking this up: sprints 1–11 are the dated log of everything
 that shipped, newest at the bottom. The list of *what shipped* doubles as
-the list of *what may surprise you*. Start at **Sprint 10**, then
-**Sprint 9**, then **Sprints 6–8** (26–27 Oct) — they changed the most —
-then read **Current state at session end** below it.
+the list of *what may surprise you*. Start at **Sprint 11** (responsive
+pass), then **Sprint 10**, then **Sprint 9**, then **Sprints 6–8**
+(26–27 Oct) — they changed the most — then read **Current state at session
+end** below it.
+
+**House workflow (applies every session)**: this file is the handoff — read
+it *instead of* re-reading the whole codebase; grep only the files you are
+about to change. The human commits their own work — never `git commit`
+unless asked, and follow their commit convention. Append the session's work
+as a new sprint entry (and touch §14/§13 as decisions land) so the next
+session can again restore context from this file alone.
 
 ### Sprint 1 — Summary route + categories
 - `/summary.php` (donut + breakdown) and `/categories.php` (POST-only JSON
@@ -304,8 +316,68 @@ then read **Current state at session end** below it.
   (+70), categories blob restored to `["Allowance"]`. Result: the
   human's six real rows untouched, **drift 0**.
 
+### Sprint 11 — Responsive pass (29 Oct 2026, newest)
+- A 10-width screenshot sweep (1920/1440/1280/1024/820/768/540/414/375/360 × 5
+  routes) found exactly two breakaged bands — **md (768–991)** and **phones
+  (≲430)**; ≥992 and 540–767 were already sound. All fixes are
+  layout-cosmetic; no route, query or validation changed.
+- **md fixes**: Summary/History picker rows moved to a later sidebar-side
+  inline split (`flex-md-row` → `flex-lg-row` in both pages) — at 768–991
+  the single-row picker (toggle + week/month select + Go + year nav) needed
+  ~700px next to the 248px rail and clipped the Go button, week select and
+  year nav past the card edge. Summary's donut/table split moved
+  `col-md-5/7` → `col-lg-5/7` — the md split left ~285px for the breakdown
+  table ("Amount" header and peso figures truncated inside the
+  table-responsive scroll). Below 992 the stack layout (donut above,
+  full-width table below) is now standard, matching how goal cards behave.
+- **phone fixes**: the shared picker forms (daily/weekly/monthly) gained
+  `flex-wrap` so the Go button / year-nav (`‹ 2025`) can drop to their own
+  line instead of clipping; the Daily date input got `w-auto` to match the
+  week/month selects (it used to fill 100% width and wrap by accident);
+  and the `.view-toggle .btn` strip (min-width 6.5rem × FOUR buttons =
+  ~430px, History's All Time group) shrinks below 576px (min-width 0,
+  smaller padding/font) so the whole group fits a 360px viewport.
+- **Topbar (<768)**: nav chips are now `white-space: nowrap` single-row
+  (labels previously wrapped to two lines, ~90px of chrome), and
+  `sidebar.php` gained a tiny scroll-into-view snap — `inline: "center"`,
+  `block: "nearest"` in try/catch — because at 375/360 the ACTIVE chip
+  could sit outside the visible strip (Summary at 375 read as a cut "Sum")
+  with no scroll affordance. Verified via CDP at true 360
+  (`Emulation.setDeviceMetricsOverride`): `scrollLeft == maxScroll` and the
+  active chip fully inside the container; `Page.captureScreenshot` shows
+  it visually. **Gotcha of record: `--virtual-time-budget` screenshots do
+  NOT reliably reflect this scroll** — the flag-based shots at 375/360
+  show the chip half-cut while real (CDP-emulated) rendering is correct;
+  assert nav checks via CDP, not the screenshot flag.
+- **Logout strip removed** (user decision): single-account context means
+  logout will never exist; a future **Settings tab** (edit name, reset
+  data, delete account) takes its place — deferred, see §14. `sidebar.php`
+  dropped the dead `is-disabled` Logout span and `global.css` dropped the
+  `.sidebar-foot` rules.
+- CSS_VERSION → **`20261029-1`** (global.css changed). Smoke after the
+  pass: §15 route matrix 200s/405 as expected, drift 0, §15 goals sanity
+  0 = 0. Retained: History stays `table-responsive` on phones (the
+  card-per-transaction redesign below ~480px is agreed and
+  **awaiting the user's signal** — see §14). Note: goal 3 "GTX 1660"
+  (investment 0) + six ledger rows with `transaction_id = 0` were left by
+  the human's own manual SQL testing between sessions; the §15 equation
+  still passes (0 = 0), treat as re-demo noise, not app output.
+
 ### Current state at session end
-- DB right now (27 Oct 2026 morning, after the human's own demo session):
+- DB right now (**29 Oct 2026, after Sprint 11**): `users` id=1 — username
+  **'Dan'**, balance 36, categories `["Allowance"]`; the landing is NOT
+  visible on `/` while 'Dan' is set (clear `users.username` to re-demo —
+  trick in §6). The human kept exercising the demo and manual SQL between
+  sessions: `transactions` grew past the 6-row snapshot below (IDs 11–16
+  are manual-SQL invest/take-back pairs), goal 3 **"GTX 1660"** exists with
+  `investment = 0`, and **six `goal_investments` rows carry
+  `transaction_id = 0`** — manual-SQL leftovers, not app output (app writes
+  always link the txn id). The §15 goals-sanity equation still passes
+  (**0 = 0**) and **balance drift is 0**, so everything is consistent;
+  treat those rows as re-demo noise. **Don't trust historical numbers — run
+  the live §15 queries** (snapshot before QA cycles, restore exactly
+  after). The 27 Oct state is preserved verbatim below for context:
+- DB as of 27 Oct 2026 morning (after the human's own demo session):
   `users` id=1 — username **'Dan'**, balance 36, categories
   `["Allowance"]`. `transactions` 6 rows, all dated 2026-10-26: +181
   Allowance, −25 Transport, −100 Other, −20 Food, and a −250/+250 Goal
@@ -337,9 +409,14 @@ then read **Current state at session end** below it.
   (Node 26 built-in WebSocket → headless Chromium `--remote-debugging-port=
   9222`: createTarget/attach → navigate → Runtime.evaluate + real mouse
   events → screenshots). It currently hovers the blocked-delete tooltip and
-  is a reusable template for any hover/click/assertion check. **/tmp does
-  not survive reboots** and the older `cdp-test.mjs` is gone — copy what
-  you rely on to a versioned location if you want it kept.
+  is a reusable template for any hover/click/assertion check. Sprint 11
+  added **`/tmp/opencode/navcheck.mjs` / `navcheck2.mjs`** — the same
+  pattern + `Emulation.setDeviceMetricsOverride` for REAL mobile-width
+  rendering (remember: `--window-size` alone doesn't always apply in scope
+  mode). **/tmp does not survive reboots** and the older `cdp-test.mjs` is
+  gone — copy what you rely on to a versioned location if you want it kept;
+  the docs above are deliberately detailed enough to rebuild any of these
+  templates from scratch.
 
 ---
 
@@ -351,11 +428,13 @@ Everything is served by LAMPP at `http://localhost/`. `/` redirects to
 ```bash
 cd /opt/lampp/htdocs
 php -l <file>            # lint one file
-mysql -h 127.0.0.1 -u user jbudget   # DB shell (no password)
+mysql --ssl=0 -h 127.0.0.1 -u user jbudget   # DB shell (no password)
 ```
 
-> **MariadB CLI note:** the `mysql` client prints a deprecation warning
-> ("use /usr/bin/mariadb instead") — harmless, ignore it.
+> **MariaDB CLI notes:** the `mysql` client prints a deprecation warning
+> ("use /usr/bin/mariadb instead") — harmless, ignore it. `--ssl=0` is
+> REQUIRED after a reboot until the server cert is regenerated (§9 gotcha 4:
+> CLI-only TLS handshake failure with a provably correct clock).
 
 ---
 
@@ -410,9 +489,9 @@ cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js vendor/bootstrap/
 ├── history.php          route: filterable, paginated history
 ├── summary.php          route: expense donut + category breakdown
 ├── categories.php       JSON endpoint: POST-only, saves a custom category
-├── goals.php            route: goal list (progress cards, Set/Edit modal)
-├── goals.php            route: goal list + ALL goal actions on the cards
-│                         (invest/take-back/edit/delete/complete; no detail page)
+├── goals.php            route: goal list (progress cards, Set/Edit modal) + ALL
+│                         actions on the cards (invest/take-back/edit/delete/
+│                         complete; no detail page), `?set=goal` opens the modal
 ├── db.php               PDO connection
 ├── model.php            all queries + formatting helpers
 ├── partials/
@@ -1060,9 +1139,12 @@ adding before submission.
   carry the same data.
 - The Daily/Weekly/Monthly toggle is a real button group with
   `aria-current="page"` on the active option.
-- Unbuilt nav items are `<span class="nav-link is-disabled">` with **no `href`**,
-  so there are no dead links — screen readers get "Goals SOON" rather than a
-  404.
+- All nav items are real `<a href>` links now (no unbuilt/SOON entries
+  remain). The old disabled-span pattern (`<span class="nav-link
+  is-disabled">` with no `href`, screen readers get the label rather than a
+  dead link) is what we'd use again if a future tab ships before its page —
+  the Logout strip was removed entirely 29 Oct (Sprint 11; single-account,
+  a Settings tab will take its place, see §14).
 
 ---
 
@@ -1070,7 +1152,8 @@ adding before submission.
 
 1. **History table clips at ~420px.** A 5th column was added for the comment
    toggle. It scrolls horizontally, but a card-per-transaction layout would be
-   better below ~480px.
+   better below ~480px. (User agreed to the card layout 29 Oct — held until
+   their signal, see §14; the table-responsive scroll is the interim fix.)
 2. **`--amber` and `--purple` are now referenced by the chart palette**
    (`--chart-1` reuses amber; `--chart-3` is a lightened purple since the
    original `--purple` fails AA as a slice on `--bg-card`). They stay defined
@@ -1103,6 +1186,13 @@ Balance), History, Summary, Categories endpoint, Goals. The wireframe's
 remaining screens (5–7) are now built — **the build is complete**.
 
 ### Deferred (deliberate, not bugs)
+- **History card-per-transaction layout on phones (<~480px)** (user
+  decision, 29 Oct): table-responsive scrolling stays for now; the card
+  layout replaces it **on the user's signal**, then as the final item of
+  the responsive work (docs §13 #1).
+- **Settings tab** (user idea, 29 Oct): replaces the removed Logout strip —
+  edit the name (today rename-permission is SQL-only), reset data, fully
+  delete the account. Not designed yet.
 - **Delete-archive for goals (user idea, 26 Oct)**: user noted that making
   Delete possible even for funded/completed goals is attainable if deleted
   goals go to an archive instead of vanishing — out of scope for now; until
@@ -1148,7 +1238,7 @@ curl -sS -o /dev/null -w "/categories.php GET (want 405) %{http_code}\n" "http:/
 
 # goals state sanity: ledger net should EQUAL net movement of goal=1
 # transactions (every goal txn comes from an app invest/take-back flow)
-mysql -h 127.0.0.1 -u user jbudget -e "
+mysql --ssl=0 -h 127.0.0.1 -u user jbudget -e "
 SELECT (SELECT COUNT(*) FROM goals) AS goals,
        (SELECT COUNT(*) FROM goals WHERE completed=1) AS completed,
        (SELECT COALESCE(SUM(amount),0) FROM goal_investments) AS ledger_net,
@@ -1160,7 +1250,7 @@ SELECT (SELECT COUNT(*) FROM goals) AS goals,
 # balance must be in sync (drift column must be 0; COALESCE variant because
 # SUM() over an EMPTY transactions table reads NULL and would frame "no rows"
 # as drift NULL instead of the legit fresh-DB 0)
-mysql -h 127.0.0.1 -u user jbudget -e "
+mysql --ssl=0 -h 127.0.0.1 -u user jbudget -e "
 SELECT (SELECT balance FROM users WHERE id=1) AS stored,
        COALESCE((SELECT SUM(CASE WHEN mode='+' THEN amount ELSE -amount END)
                  FROM transactions),0) AS computed,

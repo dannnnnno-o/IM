@@ -45,20 +45,20 @@ $pickHasNext = $period["yearScope"]["oldest"] < $period["yearScope"]["current"];
 </div>
 
 <form method="get" action="<?= htmlspecialchars($periodConfig["action"]) ?>" id="dailyForm"
-      class="d-flex align-items-center gap-2 <?= $pickActiveView === "daily" ? "" : "d-none" ?>">
+      class="d-flex flex-wrap align-items-center gap-2 <?= $pickActiveView === "daily" ? "" : "d-none" ?>">
     <input type="hidden" name="view" value="daily">
     <?php foreach($pickExtra as $pickName => $pickValue): ?>
         <input type="hidden" name="<?= htmlspecialchars($pickName) ?>" value="<?= htmlspecialchars($pickValue) ?>">
     <?php endforeach; ?>
     <label class="form-label mb-0 me-1" for="date">Date</label>
-    <input type="date" class="form-control form-control-sm" id="date" name="date"
+    <input type="date" class="form-control form-control-sm w-auto" id="date" name="date"
            max="<?= htmlspecialchars($pickToday->format("Y-m-d")) ?>"
            value="<?= htmlspecialchars($period["pickedDate"]->format("Y-m-d")) ?>">
     <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
 </form>
 
 <form method="get" action="<?= htmlspecialchars($periodConfig["action"]) ?>" id="weeklyForm"
-      class="d-flex align-items-center gap-2 <?= $pickActiveView === "weekly" ? "" : "d-none" ?>">
+      class="d-flex flex-wrap align-items-center gap-2 <?= $pickActiveView === "weekly" ? "" : "d-none" ?>">
     <input type="hidden" name="view" value="weekly">
     <?php foreach($pickExtra as $pickName => $pickValue): ?>
         <input type="hidden" name="<?= htmlspecialchars($pickName) ?>" value="<?= htmlspecialchars($pickValue) ?>">
@@ -89,7 +89,7 @@ $pickHasNext = $period["yearScope"]["oldest"] < $period["yearScope"]["current"];
 </form>
 
 <form method="get" action="<?= htmlspecialchars($periodConfig["action"]) ?>" id="monthlyForm"
-      class="d-flex align-items-center gap-2 <?= $pickActiveView === "monthly" ? "" : "d-none" ?>">
+      class="d-flex flex-wrap align-items-center gap-2 <?= $pickActiveView === "monthly" ? "" : "d-none" ?>">
     <input type="hidden" name="view" value="monthly">
     <?php foreach($pickExtra as $pickName => $pickValue): ?>
         <input type="hidden" name="<?= htmlspecialchars($pickName) ?>" value="<?= htmlspecialchars($pickValue) ?>">

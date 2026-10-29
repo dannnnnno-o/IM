@@ -203,11 +203,6 @@ a:hover {
   flex: 1;
 }
 
-.sidebar-foot {
-  padding: .75rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
 .nav-link {
   display: flex;
   align-items: center;
@@ -435,9 +430,29 @@ a.nav-link:hover {
     position: static;
   }
 
+  .sidebar-brand {
+    padding: .75rem 1.25rem;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+
   .sidebar-nav {
     flex-direction: row;
     overflow-x: auto;
+    gap: .25rem;
+    padding: .75rem;
+  }
+
+  /* Single-row chips: labels must not wrap to two lines, or the topbar
+     becomes ~90px of chrome. The strip scrolls instead (sidebar.php snaps
+     the active chip into view on load). */
+  .nav-link {
+    padding: .5rem .75rem;
+    font-size: .875rem;
+    white-space: nowrap;
   }
 
   .app-main {
@@ -452,6 +467,17 @@ a.nav-link:hover {
 
   .balance-main {
     justify-content: center;
+  }
+}
+
+/* Phone band: the 4-button All Time/Daily/Weekly/Monthly group (History)
+   is ~430px at the stocked min-width and clips inside the card. Shrink the
+   buttons so the whole group fits ~360px viewports. */
+@media (max-width: 575.98px) {
+  .btn-group.view-toggle .btn {
+    min-width: 0;
+    padding-inline: .55rem;
+    font-size: .8125rem;
   }
 }
 
