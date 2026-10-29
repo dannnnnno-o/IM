@@ -144,7 +144,7 @@ require_once("./partials/sidebar.php");
 
                         <div class="mb-3">
                             <div class="d-flex align-items-center justify-content-between">
-                                <label class="form-label" for="category">Category</label>
+                                <label class="form-label" id="categoryLabel" for="category">Category (Income)</label>
                                 <span class="d-flex align-items-center gap-3">
                                     <button type="button" class="btn-add-category" data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add Category</button>
                                 </span>
@@ -245,6 +245,7 @@ require_once("./partials/sidebar.php");
     var categorySelect = document.getElementById("category");
     var modeSelect = document.getElementById("mode");
     var newTypeSelect = document.getElementById("newCategoryType");
+    var categoryLabel = document.getElementById("categoryLabel");
 
     /* Sprint 14: the picker only shows categories whose type allows the
        selected transaction mode ("both" ones always). A stale selection
@@ -252,6 +253,10 @@ require_once("./partials/sidebar.php");
        server re-checks the pair on POST, so this is UX only. */
     function applyModeFilter(){
         var transactionKind = modeSelect.value === "expense" ? "expense" : "income";
+
+        if(categoryLabel){
+            categoryLabel.textContent = "Category (" + (transactionKind === "expense" ? "Expense" : "Income") + ")";
+        }
 
         for(var i = 0; i < categorySelect.options.length; i++){
             var option = categorySelect.options[i];
