@@ -1,6 +1,6 @@
 <?php
 /* Cache-busting for global.css: bump on every stylesheet change. */
-define("CSS_VERSION", "20261029-1");
+define("CSS_VERSION", "20261029-2");
 
 $pageTitle = $pageTitle ?? 'J-Budget';
 $activePage = $activePage ?? '';

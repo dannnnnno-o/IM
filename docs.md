@@ -21,7 +21,14 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 > "Clear data & reset balance" (optional custom-category wipe), and a
 > factory-reset "Delete account" — see §6, §8 and Sprint 12 below. Sprint
 > 13 (29 Oct) made the success flash notifications fade away automatically
-> after 5s while validation errors stay persistent. The DB was wiped and re-seeded
+> after 5s while validation errors stay persistent. Sprint 14 (same day)
+> gave every category a type (expense/income/both): the Make Transaction
+> picker filters by mode, mismatched pairs are rejected server-side, and
+> the "Manage Categories" section lives in Settings (between Profile and
+> the Danger Zone, Sprint 15) with read-only-by-default editing,
+> rename-relabels-transactions, remove, per-user type overrides and
+> DB-column skip-flags.
+> The DB was wiped and re-seeded
 > fresh 26 Oct, then loaded with the
 > human's real demo data — see the Sprint 7/9 state notes. See §14 for
 > what remains deferred and §0 for session history.
@@ -30,12 +37,14 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
 ## 0. Session handoff — read me first (grown 23–26 Oct 2026)
 
-For the agent picking this up: sprints 1–13 are the dated log of everything
+For the agent picking this up: sprints 1–14 are the dated log of everything
 that shipped, newest at the bottom. The list of *what shipped* doubles as
-the list of *what may surprise you*. Start at **Sprint 13**, then
-**Sprint 12** (Settings tab), then **Sprint 11** (responsive pass), then
-**Sprint 9–10**, then **Sprints 6–8** (26–27 Oct), then read **Current
-state at session end** below it.
+the list of *what may surprise you*. Start at **Sprint 15** (Manage
+Categories), then **Sprint 14** (category
+types), then **Sprint 13** (flash auto-dismiss), then **Sprint 12**
+(Settings tab), then **Sprint 11** (responsive pass), then **Sprint 9–10**,
+then **Sprints 6–8** (26–27 Oct), then read **Current state at session
+end** below it.
 
 **House workflow (applies every session)**: this file is the handoff — read
 it *instead of* re-reading the whole codebase; grep only the files you are
@@ -486,6 +495,151 @@ session can again restore context from this file alone.
   readable verbatim past 6.2s; manual close at 1.3s → node detached,
   page clean at 6s. §15 route smoke re-run clean.
 
+### Sprint 14 — Category types: mode-aware picker (29 Oct 2026 evening, newest)
+- **Every category now has a type** (`expense` / `income` / `both`) and the
+  Make Transaction picker only shows categories that allow the selected
+  transaction mode — killing the misleading "income + Food" combination
+  (legal today, rare in practice). User confirmed all design points
+  beforehand; the "delete/modify existing rows" side is untouched.
+- **Storage**: new `PREDEFINED_PICKABLE_CATEGORIES` map in `model.php`
+  (Food/Groceries/Transport/Bills/Entertainment/Health → expense, Salary →
+  income, Other → both; **Goal Investment deliberately absent** — it stays
+  a system label via `GOAL_CATEGORY`/`PREDEFINED_CATEGORIES` but is not
+  pickable on MT and a POST naming it falls into "Choose a valid
+  category."). Custom categories moved to shaped JSON in
+  `users.categories` (`[{"name":…,"type":…}]`) — the former blob
+  rectangle of `["Allowance"]` style is read with **tolerant-migration
+  semantics: any legacy string entry defaults to `both` on read** (user
+  decision 3) and the blob is rewritten canonically only by
+  `save_custom_category()`, so existing data never bricks.
+- **Picker UX (make-transactions.php)**: options render with `data-type`;
+  a small inline script re-filters on Mode change (no reload); a stale
+  selection (now-invisible pick) resets to the placeholder rather than
+  silently swapping; "Other" is pinned **last** in the list, after customs
+  (user rule added at build time). The Add Category modal gained a Type
+  select (Expense/Income/Both) that **defaults to the form's current mode
+  on open** (`show.bs.modal`, decision 2b) and sends `type` in the fetch
+  payload; the freshly created option gets its `data-type` and is
+  auto-selected only if legal for the mode.
+- **Server enforcement (the real check)**: `category_mode_error()` in
+  model.php replaces the existence-only check — unknown name or Goal
+  Investment → "Choose a valid category."; known-but-wrong mode → the
+  clearer "**`Food` cannot be used for an income transaction.**" family
+  (decision 4), one template, both directions. The `$mode ?? "+"`
+  fallback keeps the check consistent when the mode itself erred.
+- **Endpoint**: `categories.php` accepts `type` (defaults `both` for
+  legacy callers; invalid → "Choose a valid category type.");
+  `save_custom_category()` signature grew to `(pdo, userId, name, type)`,
+  its response contract (`{ok, error, categories:[names]}`) is unchanged.
+- **"Manage Custom Categories" link** (user request) sits in the category
+  label row beside + Add Category, reusing `.btn-add-category` styling —
+  pure `<a href="/settings.php">`, no function/message by design; the
+  Settings management UI is a §14 deferred item.
+- **No CSS change → CSS_VERSION stays `20261029-1`** (link reuses the
+  existing class). `all_categories()`/`category_is_known()` remain in
+  model.php as the name-level layer (used by nothing today; candidate
+  helpers for the future Settings UI — same case-insensitive duplicate
+  rules).
+- QA (CDP `categories-type.mjs` + curl, mysqldump snapshot/restore per
+  §11): picker lists verified server-side (typed options, Other last,
+  Goal Investment absent); CDP A–G all PASS — income-mode visible set,
+  expense-mode visible set incl. both-customs, stale pick reset, modal
+  type default follows mode both ways, add-while-income lands selected
+  typed `income` and hides on expense, Manage link navigates, and one
+  real valid POST (expense Food 10) → dashboard flash text
+  "Expense transaction saved." with the Sprint 13 auto-fade intact at 6s.
+  Mismatch/curl matrix: income+Food, expense+Salary (clearer messages),
+  Goal Investment POST, case-insensitive dup with typed storage, invalid
+  type, typeless legacy request → all correct; failed POSTs proven
+  no-write (row set identical to snapshot); blob restored bit-exact
+  after the write-QA cycles. Three first-run FAILs were wrong test
+  assertions (I forgot `both` customs are correctly visible in expense
+  mode; picked a both-category as the "stale" pick; asserted a flash
+  wording the house doesn't use) — app unchanged, expectations corrected.
+
+### Sprint 15 — Manage Categories section (29 Oct 2026 night, newest)
+- Settings gained its middle card — **"Manage Categories"**, between
+  Profile and Danger Zone (id `#manage-categories`, the Make Transaction
+  "Manage Categories" link anchors to it via `settings.php#manage-categories`).
+  All three mockups the user drew in `manage-categories/` are matched:
+  the table (Name | Income | Expense | actions), the two-step rename flow
+  (input modal → confirm modal), and the remove modal with its verbatim
+  note that past transactions are untouched.
+- **Read-only by default with a single edit gate** (user rule): checkboxes
+  and row actions render disabled; the section-header **Edit button
+  toggles editing ON and is disabled while editing — it can never toggle
+  OFF**. Only Cancel (restores the staged checkbox states exactly) or
+  Save Changes (success → read-only; failure → stays editing with an
+  inline error) exit. Zero-checked rows are blocked on Save with
+  "Each category must allow at least one mode."
+- **Predefined rows**: type editable (staged + applied on Save), name and
+  deletion NOT — their pencil/trash stay disabled even in edit mode,
+  dimmed, with a wrapper-span tooltip "Built-in categories can't be
+  renamed or removed." (§6c family: disabled buttons emit no hover).
+  **Goal Investment absent entirely** (user decision 4 — system label).
+- **Rename** (customs only, `rename_custom_category()` in model.php):
+  validates blank/≤30/dup case-insensitively — *excluding the renamed row
+  itself, which is what makes `custom1 → Custom1` legal* — then one PDO
+  transaction relabels **every matching transaction** (varchar(30) is
+  case-insensitive, so `WHERE category = :old` catches all casings) and
+  rewrites the blob. History/Summary relabel as consequence.
+- **Remove** (customs only): `remove_custom_category()` drops the pickable
+  entry only; stored transaction strings keep labeling (mockup note; a
+  later same-named custom visually re-merges with orphans — accepted).
+- **Save Changes** (`save_category_types()`): rides the staged full
+  name→type map. Predefined entries persist as **deviations** in the new
+  `users.category_overrides` column (`{"Food":"income"}` shape,
+  invalid/unknown values ignored at read; `category_type_map()` = const
+  ← overrides ← blob rows, so MT's picker + server validation inherit
+  section edits). Both blob rows and overrides live in one UPDATE — one
+  statement, no transaction needed. Customs' types rewrite in the blob.
+- **Skip flags are DB columns** (user decision 3 — no browser storage):
+  `users.skip_rename_confirm` / `skip_remove_confirm`, projected onto
+  `<section data-skip-rename data-skip-remove>`; with a flag set the
+  confirm modal is **bypassed entirely** (the input modal's Rename button
+  or the trash icon IS the execution). The flag persists on the same POST
+  via `skip_confirm=1` — even when the action then fails validation (the
+  user did see and accept the confirm). Rename-modal UX note of record:
+  the modal STAYS OPEN during the fetch so failure surfaces inline, and
+  success path closes it guarded by `classList.contains("show")` — a
+  Bootstrap `show()` issued during another modal's hide fade silently
+  no-ops (§6c family, hit for the fourth time).
+- **Clear/factory scope** (user decision 3): the Clear-Data checkbox now
+  also resets `category_overrides` + both skip flags; factory reset
+  wipes them unconditionally (no preference outlives its identity).
+- **Schema (29 Oct)**: `ALTER TABLE users ADD category_overrides
+  VARCHAR(2500) NOT NULL DEFAULT '{}'`, `ADD skip_rename_confirm
+  TINYINT(1) NOT NULL DEFAULT 0`, `ADD skip_remove_confirm TINYINT(1)
+  NOT NULL DEFAULT 0`.
+- Endpoint `categories.php` now action-routes (`add` default unchanged
+  for the MT modal; `rename`, `remove`, `save_types`), status 200/400 by
+  result. Two MT-modal-era response codes were consolidated (add
+  returned 201 before; both add flows read only `data.ok`).
+- **MAJOR QA LESSON (established tonight, of record)**: a leaked headless
+  Chromium **zombie-squatted `--remote-debugging-port=9222`** — every
+  later script spawned a fresh chrome that failed to bind, then silently
+  connected to the zombie's **stale pre-fix page** (its
+  `performance.now()` keeping old-run clock — 500+ s into a "fresh"
+  navigation gave it away via a modal-op trace). Two honest-looking FAIL
+  cascades were QA-infra ghosts, and one REAL bootstrap modal-race bug
+  was found between them. Rule now: **always pass a fresh port per
+  script session** (sed the port, `ss -ltnp | grep 9222` to check) and
+  never trust repeated runs without verifying `performance.now()` is
+  sane. Scripts updated to port 9223.
+- QA (CDP `manage-categories.mjs` A–J all PASS + `mc-dup.mjs` +
+  `categories-type.mjs` re-run on fresh port; mysqldump
+  snapshot/restore per §11): read-only default inert, edit gate
+  one-way, zero-checked block, cancel-restores, save-persists + exits,
+  rename two-modal relay with case-only rename, skip-flag persistence +
+  direct-execution bypass, dup-vs-custom and dup-vs-predefined errors
+  surfaced IN the still-open modal, remove flow disposes the row,
+  Danger-Zone scope checks WITHOUT checkbox keep prefs / WITH checkbox
+  reset them / factory reset nukes all, MT picker re-QA (Sprint 14
+  suite green incl. overrides layer), §15 smoke clean, DB restored
+  bit-exact after every write cycle. Live human traffic interleaved
+  with QA runs — the app behaved correctly throughout per the
+  established semantics.
+
 ### Current state at session end
 - DB right now (**29 Oct 2026, after Sprint 11**): `users` id=1 — username
   **'Dan'**, balance 36, categories `["Allowance"]`; the landing is NOT
@@ -797,10 +951,18 @@ truth:
   `model.php` (single source of truth): Food, Groceries, Transport, Bills,
   Salary, Entertainment, Health, Other.
 - **Custom categories** are a JSON array in `users.categories`
-  (varchar(2500)). **Only** `get_custom_categories()` and
-  `save_custom_category()` may read/write that column. This is a stop-gap for
-  client-side storage in browser **localStorage later** — keep access confined
-  to those two functions so the swap stays contained.
+  (varchar(2500)). **Only** `get_custom_categories()`/`get_custom_category_rows()`
+  and `save_custom_category()` may read/write that column (plus the
+  Sprint 15 management functions which rewrite it atomically). This is a
+  stop-gap for client-side storage in browser **localStorage later** —
+  keep access confined to those functions so the swap stays contained.
+- **Sprint 14/15 type layer**: types = const map ← per-user
+  `users.category_overrides` (JSON deviations for predefined; access via
+  `get_category_overrides()`/`save_category_types()` only) ← blob rows.
+  Confirm-skip prefs are `users.skip_rename_confirm`/`skip_remove_confirm`
+  (columns, not browser storage — user decision). A rename relabels old
+  transactions (Sprint 15 supersedes the "no retro-update" rule below:
+  removal still never touches past rows).
 - **Limits**: name ≤ 30 chars (mb, matching the column width), ≤ 20 custom
   categories, case-insensitive dupes rejected (against custom *and*
   predefined lists). All user input — validated server-side,
@@ -812,11 +974,11 @@ truth:
   new rows — `sum_by_category()`'s NULLIF/COALESCE fallback stays only as
   dead-code defence.
 - **Write path**: a category is created only via `POST /categories.php`
-  (dedicated endpoint, JSON response, GET → 405). The transaction-submit POST
+  (dedicated endpoint, JSON response, GET → 405; Sprint 15 action-routes
+  add/rename/remove/save_types). The transaction-submit POST
   *never* writes `users.categories`. Transactions store the category **name
-  string** (like `mode` stores `+`), no FK. Renaming a custom category will
-  **not** retro-update old transactions — stated limitation, same spirit as
-  "no date validation for goals".
+  string** (like `mode` stores `+`), no FK. *(Sprint 15 update: renames DO
+  retro-relabel past transactions; removal deliberately never does.)*
 - **Migration note (23 Oct 2026)**: old descriptions were migrated 1:1 —
   distinct labels seeded as custom categories via the endpoint, then rows
   copied before `description` was dropped. Backup at
@@ -961,10 +1123,35 @@ the floor is a validation rule.
 | amount | `ctype_digit()` **and** `> 0` | "Amount must be a whole positive number." |
 | amount | `> 2147483647` | "Amount is too large." |
 | category | required (is the transaction's label) | "Category is required." |
-| category | must exist in predefined ∪ custom | "Choose a valid category." |
+| category | Sprint 14: must be pickable **for the submitted mode** — name known in the type map (predefined pickable ∪ custom) **and** its type (`expense`/`income`/`both`) allows the mode *or* it is `both` | "Choose a valid category." |
+| category | known name whose type contradicts the mode (e.g. `Food` + income) | "`Food` cannot be used for an {income\|expense} transaction." |
 | comment | optional | — |
 | comment | `mb_strlen() > 500` | "Comment must be 500 characters or fewer." |
 | expense (mode `-`) | `amount` > current `users.balance` (Sprint 10) | "You can spend at most ₱…" |
+
+### Manage Categories (Settings, Sprint 15 — fetch endpoints, all `{ok, error}`)
+| Action | Rule | Message |
+|---|---|---|
+| rename | new name required | "Category name is required." |
+| rename | new name ≤ 30 chars (`mb_strlen`) | "Category name must be 30 characters or fewer." |
+| rename | current must exist as a **custom** row (predefined/GI impossible from the UI, endpoint-enforced) | "Choose a valid category." |
+| rename | new name case-insensitively unique against predefined ∪ customs **excluding the renamed row** (`custom1 → Custom1` is legal) | "That category already exists." |
+| rename | storage limit on encoded blob | "Category list would exceed its storage limit." |
+| remove | name must exist as a custom row; past transactions untouched | "Choose a valid category." |
+| save_types | every name in the pickable universe (case-insensitive) | "Choose a valid category." |
+| save_types | every value `expense`/`income`/`both` (empty checkboxes never reach the server — the edit-gate blocks them) | "Choose a valid category type." |
+| save_types | per-user overrides + blob rewrite in ONE UPDATE; both encoded ≤ 2500 | "Category list would exceed its storage limit." |
+| skip flags | `skip_confirm=1` on rename/remove persists the confirm-skip flag **before** validation — a failed action still leaves the flag set (user saw the confirm) | — |
+
+> **Goal Investment is not pickable on Make Transaction** (Sprint 14): it is
+> the system-written label for goal invest/take-back rows (`GOAL_CATEGORY`
+> const) and is intentionally absent from `category_type_map()` — a POST
+> naming it falls into the "Choose a valid category." family. It keeps
+> labeling rows in History/Summary via the name lists. Server check is the
+> enforcement; the picker's live JS filter (options carry `data-type`,
+> re-filtered on mode change; a stale pick resets to the placeholder) is
+> only UX. "Other" is pinned LAST in the picker, after customs (user rule).
+
 
 `ctype_digit()` rejects `-5`, `10.5`, `abc`, `1e5` and `0x10` in one shot,
 because none of those are decimal digit strings. That single check is why those
@@ -1356,9 +1543,11 @@ remaining screens (5–7) are now built — **the build is complete**.
   Delete possible even for funded/completed goals is attainable if deleted
   goals go to an archive instead of vanishing — out of scope for now; until
   then completed goals stay undeletable via the app (see §6c / §8).
-- Category rename/delete UI (add-only so far; removal is safe because stored
-  categories on transactions are strings).
-- Real category editing on existing transactions (must edit via SQL today).
+- **Category rename/delete for customs shipped in Sprint 15** (see the
+  Sprint 15 entry + §8); removable tail: predefined categories remain
+  name-locked by design.
+- Real category editing on existing transactions (type changes land via
+  Save Changes; free per-transactions editing is still SQL-only).
 - Automated test suite (curl + CDP patterns in this doc are the manual path).
 - `transactions.goal` is 0/1, not a goal id — a future "per-goal spend"
   report would need a goal id column or ledger join (`goal_investments`

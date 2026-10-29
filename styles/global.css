@@ -374,6 +374,30 @@ a.nav-link:hover {
   color: var(--text);
 }
 
+/* ---- Settings: Manage Categories (Sprint 15) ---- */
+
+/* Borderless icon actions (pencil/trash); dimmed when disabled. */
+.mc-icon-btn {
+  padding: .15rem .35rem;
+  border: 0;
+  background: transparent;
+  color: var(--brand-text);
+  line-height: 1;
+}
+
+.mc-icon-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.mc-icon-btn.text-danger:hover:not(:disabled) {
+  color: var(--bs-danger) !important;
+}
+
+.mc-icon-btn:disabled {
+  color: var(--text-muted, #6c757d);
+  opacity: .55;
+}
+
 .tiny {
   font-size: .75rem;
 }

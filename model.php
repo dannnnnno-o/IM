@@ -12,8 +12,30 @@ const PREDEFINED_CATEGORIES = [
 ];
 
 /* Fixed category for invest/take-back rows written by goals.php.
-   Also part of PREDEFINED_CATEGORIES so History/Summary label it naturally. */
+    Also part of PREDEFINED_CATEGORIES so History/Summary label it naturally. */
 const GOAL_CATEGORY = "Goal Investment";
+
+/* ---- Category types (Sprint 14, 29 Oct 2026) ------------------------------- */
+
+/* Transaction modes a category may serve: "expense", "income" or "both". */
+const CATEGORY_EXPENSE = "expense";
+const CATEGORY_INCOME = "income";
+const CATEGORY_BOTH = "both";
+
+/* Every predefined category that can be picked on the Make Transaction
+    form, with the modes it allows. Goal Investment is deliberately ABSENT —
+    it is the system-written label for goal invest/take-back rows and is not
+    a spending habit; History/Summary still label it via the name lists. */
+const PREDEFINED_PICKABLE_CATEGORIES = [
+    "Food" => CATEGORY_EXPENSE,
+    "Groceries" => CATEGORY_EXPENSE,
+    "Transport" => CATEGORY_EXPENSE,
+    "Bills" => CATEGORY_EXPENSE,
+    "Salary" => CATEGORY_INCOME,
+    "Entertainment" => CATEGORY_EXPENSE,
+    "Health" => CATEGORY_EXPENSE,
+    "Other" => CATEGORY_BOTH,
+];
 
 const MAX_CUSTOM_CATEGORIES = 20;
 const MAX_CATEGORY_NAME_LENGTH = 30;
@@ -27,7 +49,11 @@ const MAX_USERNAME_LENGTH = 50;
    UPDATE against SQLSTATE 22003 "out of range". */
 const MAX_AMOUNT = 2147483647;
 
-function get_custom_categories(object $pdo, int $userId){
+/* Custom categories live in users.categories as a JSON array. Since Sprint
+   14 each entry is an object {"name":…, "type":…}; legacy entries are
+   plain strings and read as "both" (migration tolerance — the blob is only
+   rewritten canonically by save_custom_category). */
+function get_custom_category_rows(object $pdo, int $userId){
     $sql = "SELECT categories FROM users WHERE id = :id; ";
 
     $statement = $pdo -> prepare($sql);
@@ -46,13 +72,97 @@ function get_custom_categories(object $pdo, int $userId){
         return [];
     }
 
+    $validTypes = [CATEGORY_EXPENSE, CATEGORY_INCOME, CATEGORY_BOTH];
+    $rows = [];
+
+    foreach($decoded as $entry){
+        if(is_string($entry)){
+            $legacyName = trim($entry);
+            if($legacyName !== ""){
+                $rows[] = ["name" => $legacyName, "type" => CATEGORY_BOTH];
+            }
+            continue;
+        }
+
+        if(!is_array($entry)){
+            continue;
+        }
+
+        $name = trim((string) ($entry["name"] ?? ""));
+        if($name === ""){
+            continue;
+        }
+
+        $type = (string) ($entry["type"] ?? CATEGORY_BOTH);
+        if(!in_array($type, $validTypes, true)){
+            $type = CATEGORY_BOTH;
+        }
+
+        $rows[] = ["name" => $name, "type" => $type];
+    }
+
+    return $rows;
+}
+
+/* Name-only view (Settings preview, duplicate checks, the add-category
+   AJAX contract) over the shaped rows. */
+function get_custom_categories(object $pdo, int $userId){
+    return array_map(function(array $row){
+        return $row["name"];
+    }, get_custom_category_rows($pdo, $userId));
+}
+
+/* Predefined-type deviations live in users.category_overrides as JSON
+   {"Food":"income"} — only entries that actually deviate from the const
+   map. Invalid values are ignored at read time; written exclusively by
+   save_category_types(). */
+function get_category_overrides(object $pdo, int $userId){
+    $sql = "SELECT category_overrides FROM users WHERE id = :id; ";
+
+    $statement = $pdo -> prepare($sql);
+    $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+    $statement -> execute();
+
+    $row = $statement -> fetch(PDO::FETCH_ASSOC);
+    $raw = (string) ($row["category_overrides"] ?? "{}");
+
+    $decoded = json_decode($raw, true);
+    if(!is_array($decoded)){
+        return [];
+    }
+
     $clean = [];
-    foreach($decoded as $name){
-        if(is_string($name) && trim($name) !== ""){
-            $clean[] = trim($name);
+    foreach($decoded as $name => $type){
+        if(is_string($name)
+           && in_array($type, [CATEGORY_EXPENSE, CATEGORY_INCOME, CATEGORY_BOTH], true)){
+            $clean[$name] = $type;
         }
     }
     return $clean;
+}
+
+/* Every category pickable on Make Transaction with its allowed modes:
+   const map, then per-user predefined overrides, then custom rows.
+   Goal Investment is not in the map by design (not pickable); customs
+   override on exact case — duplicates are impossible because
+   save_custom_category rejects case-insensitive collisions. */
+function category_type_map(object $pdo, int $userId){
+    $map = PREDEFINED_PICKABLE_CATEGORIES;
+
+    foreach(get_category_overrides($pdo, $userId) as $name => $type){
+        foreach($map as $known => $knownType){
+            if(mb_strtolower($known) === mb_strtolower($name)){
+                $map[$known] = $type;
+                break;
+            }
+        }
+    }
+
+    foreach(get_custom_category_rows($pdo, $userId) as $row){
+        $map[$row["name"]] = $row["type"];
+    }
+
+    return $map;
 }
 
 function all_categories(object $pdo, int $userId){
@@ -74,7 +184,40 @@ function category_is_known(object $pdo, int $userId, string $category){
     return false;
 }
 
-function save_custom_category(object $pdo, int $userId, string $name){
+/* Sprint 14: type-aware Make Transaction validation — replaces the old
+   existence-only check at the route. Returns null when the pair is usable,
+   otherwise the banner message: "Choose a valid category." for unknown
+   names (Goal Investment included — it is not in the pickable map), or the
+   clearer mode-mismatch line. $modeSign is "+" (income) or "-" (expense);
+   the POST re-check is the enforcement, the picker filter is just UX. */
+function category_mode_error(object $pdo, int $userId, string $category, string $modeSign){
+    $category = trim($category);
+
+    $matchType = null;
+    $label = $category;
+    foreach(category_type_map($pdo, $userId) as $name => $type){
+        if(mb_strtolower($name) === mb_strtolower($category)){
+            $matchType = $type;
+            $label = $name;
+            break;
+        }
+    }
+
+    if($matchType === null){
+        return "Choose a valid category.";
+    }
+
+    $transactionKind = ($modeSign === "-") ? "expense" : "income";
+    $allowed = ($modeSign === "-") ? CATEGORY_EXPENSE : CATEGORY_INCOME;
+
+    if($matchType === CATEGORY_BOTH || $matchType === $allowed){
+        return null;
+    }
+
+    return "{$label} cannot be used for an {$transactionKind} transaction.";
+}
+
+function save_custom_category(object $pdo, int $userId, string $name, string $type = CATEGORY_BOTH){
     $name = trim($name);
 
     if($name === ""){
@@ -85,28 +228,37 @@ function save_custom_category(object $pdo, int $userId, string $name){
         return ["ok" => false, "error" => "Category name must be " . MAX_CATEGORY_NAME_LENGTH . " characters or fewer.", "categories" => get_custom_categories($pdo, $userId)];
     }
 
-    $existing = get_custom_categories($pdo, $userId);
+    if(!in_array($type, [CATEGORY_EXPENSE, CATEGORY_INCOME, CATEGORY_BOTH], true)){
+        return ["ok" => false, "error" => "Choose a valid category type.", "categories" => get_custom_categories($pdo, $userId)];
+    }
+
+    $existing = get_custom_category_rows($pdo, $userId);
+    $existingNames = array_map(function(array $row){
+        return $row["name"];
+    }, $existing);
 
     if(count($existing) >= MAX_CUSTOM_CATEGORIES){
-        return ["ok" => false, "error" => "You can have at most " . MAX_CUSTOM_CATEGORIES . " custom categories.", "categories" => $existing];
+        return ["ok" => false, "error" => "You can have at most " . MAX_CUSTOM_CATEGORIES . " custom categories.", "categories" => $existingNames];
     }
 
     foreach(PREDEFINED_CATEGORIES as $known){
         if(mb_strtolower($known) === mb_strtolower($name)){
-            return ["ok" => false, "error" => "That category already exists.", "categories" => $existing];
+            return ["ok" => false, "error" => "That category already exists.", "categories" => $existingNames];
         }
     }
 
-    foreach($existing as $known){
+    foreach($existingNames as $known){
         if(mb_strtolower($known) === mb_strtolower($name)){
-            return ["ok" => false, "error" => "That category already exists.", "categories" => $existing];
+            return ["ok" => false, "error" => "That category already exists.", "categories" => $existingNames];
         }
     }
 
-    $existing[] = $name;
+    $existing[] = ["name" => $name, "type" => $type];
     $encoded = json_encode($existing, JSON_UNESCAPED_UNICODE);
     if($encoded === false || strlen($encoded) > 2500){
-        return ["ok" => false, "error" => "Category list would exceed its storage limit.", "categories" => get_custom_categories($pdo, $userId)];
+        /* The typed storage shape is longer than the legacy name list, so
+           this limit guards on the canonical shape actually written. */
+        return ["ok" => false, "error" => "Category list would exceed its storage limit.", "categories" => $existingNames];
     }
 
     $sql = "UPDATE users SET categories = :categories WHERE id = :id; ";
@@ -116,7 +268,196 @@ function save_custom_category(object $pdo, int $userId, string $name){
     $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
     $statement -> execute();
 
-    return ["ok" => true, "error" => null, "categories" => $existing];
+    return ["ok" => true, "error" => null, "categories" => array_merge($existingNames, [$name])];
+}
+
+/* ---- Manage Categories (Sprint 15, 29 Oct 2026) ---------------------------- */
+
+/* Shared shape validator for typed category storage. */
+function category_type_is_valid(string $type){
+    return in_array($type, [CATEGORY_EXPENSE, CATEGORY_INCOME, CATEGORY_BOTH], true);
+}
+
+/* Unique-against-others check: a name must not collide case-insensitively
+   with a predefined category or with any OTHER custom row. Excluding self
+   is what makes "custom1" -> "Custom1" (same word, new casing) legal. */
+function category_name_taken(object $pdo, int $userId, string $name, string $except = ""): bool{
+    foreach(PREDEFINED_CATEGORIES as $known){
+        if(mb_strtolower($known) === mb_strtolower($name)){
+            return true;
+        }
+    }
+    foreach(get_custom_category_rows($pdo, $userId) as $row){
+        if($row["name"] === $except){
+            continue;
+        }
+        if(mb_strtolower($row["name"]) === mb_strtolower($name)){
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Rename a custom category AND relabel every past transaction that used it
+   (user rule: History/Summary reflect the new name). One PDO transaction —
+   the blob rewrite and the transactions UPDATE succeed or fail together.
+   Predefined categories never reach here (UI-gated + endpoint-validated:
+   rename targets must exist as custom rows). */
+function rename_custom_category(object $pdo, int $userId, string $old, string $new){
+    $old = trim($old);
+    $new = trim($new);
+
+    if($new === ""){
+        return ["ok" => false, "error" => "Category name is required."];
+    }
+    if(mb_strlen($new) > MAX_CATEGORY_NAME_LENGTH){
+        return ["ok" => false, "error" => "Category name must be " . MAX_CATEGORY_NAME_LENGTH . " characters or fewer."];
+    }
+    if(!category_name_taken($pdo, $userId, $old)){
+        return ["ok" => false, "error" => "Choose a valid category."];
+    }
+    if(category_name_taken($pdo, $userId, $new, $old)){
+        return ["ok" => false, "error" => "That category already exists."];
+    }
+
+    $rows = get_custom_category_rows($pdo, $userId);
+    foreach($rows as $index => $row){
+        if(mb_strtolower($row["name"]) === mb_strtolower($old)){
+            $rows[$index]["name"] = $new;
+        }
+    }
+    $encoded = json_encode($rows, JSON_UNESCAPED_UNICODE);
+    if($encoded === false || strlen($encoded) > 2500){
+        return ["ok" => false, "error" => "Category list would exceed its storage limit."];
+    }
+
+    $pdo -> beginTransaction();
+    try{
+        /* transactions.category is varchar(30) under a case-insensitive
+           collation, so the WHERE already matches "custom1" and "Custom1"
+           rows alike. Comment text is untouched. */
+        $statement = $pdo -> prepare("UPDATE transactions SET category = :new WHERE category = :old; ");
+        $statement -> bindParam(":new", $new);
+        $statement -> bindParam(":old", $old);
+        $statement -> execute();
+
+        $statement = $pdo -> prepare("UPDATE users SET categories = :categories WHERE id = :id; ");
+        $statement -> bindParam(":categories", $encoded);
+        $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+        $statement -> execute();
+
+        $pdo -> commit();
+    }
+    catch(PDOException $e){
+        $pdo -> rollBack();
+        throw $e;
+    }
+
+    return ["ok" => true, "error" => null];
+}
+
+/* Remove a custom category: picker/management only — past transactions
+   keep the stored string and keep labeling in History/Summary (user rule,
+   stated verbatim in the remove modal). Single UPDATE, no transaction. */
+function remove_custom_category(object $pdo, int $userId, string $name){
+    $name = trim($name);
+
+    if(!category_name_taken($pdo, $userId, $name)){
+        return ["ok" => false, "error" => "Choose a valid category."];
+    }
+
+    $rows = array_values(array_filter(get_custom_category_rows($pdo, $userId),
+        function(array $row) use ($name){
+            return mb_strtolower($row["name"]) !== mb_strtolower($name);
+        }));
+    $encoded = json_encode($rows, JSON_UNESCAPED_UNICODE);
+    if($encoded === false || strlen($encoded) > 2500){
+        return ["ok" => false, "error" => "Category list would exceed its storage limit."];
+    }
+
+    $sql = "UPDATE users SET categories = :categories WHERE id = :id; ";
+    $statement = $pdo -> prepare($sql);
+    $statement -> bindParam(":categories", $encoded);
+    $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+    $statement -> execute();
+
+    return ["ok" => true, "error" => null];
+}
+
+/* Save Changes over the whole section: the staged name => type map covers
+   EVERY pickable category. Predefined entries are written as overrides
+   (storing the const value back is redundant but harmless); customs are
+   written back into the blob.
+   Both live in the same users row, so one UPDATE, no transaction needed. */
+function save_category_types(object $pdo, int $userId, array $types){
+    $universe = category_type_map($pdo, $userId);
+    $universeLower = [];
+    foreach($universe as $name => $type){
+        $universeLower[mb_strtolower($name)] = [$name, $type];
+    }
+
+    $overrides = [];
+    $customTypes = [];
+    foreach($types as $name => $type){
+        $key = mb_strtolower((string) $name);
+        if(!isset($universeLower[$key])){
+            return ["ok" => false, "error" => "Choose a valid category."];
+        }
+        if(!category_type_is_valid((string) $type)){
+            return ["ok" => false, "error" => "Choose a valid category type."];
+        }
+
+        [$canonical] = $universeLower[$key];
+        if(isset(PREDEFINED_PICKABLE_CATEGORIES[$canonical])){
+            $overrides[$canonical] = (string) $type;
+        }
+        else{
+            $customTypes[$key] = (string) $type;
+        }
+    }
+
+    $rows = get_custom_category_rows($pdo, $userId);
+    foreach($rows as $index => $row){
+        $key = mb_strtolower($row["name"]);
+        if(isset($customTypes[$key])){
+            $rows[$index]["type"] = $customTypes[$key];
+        }
+    }
+    $encodedCategories = json_encode($rows, JSON_UNESCAPED_UNICODE);
+    $encodedOverrides = json_encode($overrides, JSON_UNESCAPED_UNICODE);
+    if($encodedCategories === false || $encodedOverrides === false
+       || strlen($encodedCategories) > 2500 || strlen($encodedOverrides) > 2500){
+        return ["ok" => false, "error" => "Category list would exceed its storage limit."];
+    }
+
+    $sql = "UPDATE users SET category_overrides = :overrides, categories = :categories WHERE id = :id; ";
+    $statement = $pdo -> prepare($sql);
+    $statement -> bindParam(":overrides", $encodedOverrides);
+    $statement -> bindParam(":categories", $encodedCategories);
+    $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+    $statement -> execute();
+
+    return ["ok" => true, "error" => null];
+}
+
+/* The confirm modals' "Do not show this again" checkboxes persist in the
+   users row (per user decision — no localStorage). Passed along in the
+   same fetch call as the confirming action (skip_confirm=1), so the flag
+   costs no extra roundtrip. */
+function set_confirmation_skip(object $pdo, int $userId, string $kind){
+    $column = match($kind){
+        "rename" => "skip_rename_confirm",
+        "remove" => "skip_remove_confirm",
+        default => null,
+    };
+    if($column === null){
+        return;
+    }
+
+    $sql = "UPDATE users SET {$column} = 1 WHERE id = :id; ";
+    $statement = $pdo -> prepare($sql);
+    $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+    $statement -> execute();
 }
 
 function get_user(object $pdo, int $id){
@@ -167,7 +508,10 @@ function clear_records_and_balance(object $pdo, int $userId, bool $alsoClearCate
         wipe_record_tables($pdo);
 
         $sql = "UPDATE users SET balance = 0"
-             . ($alsoClearCategories ? ", categories = '[]'" : "")
+             . ($alsoClearCategories
+                ? ", categories = '[]', category_overrides = '{}',
+                   skip_rename_confirm = 0, skip_remove_confirm = 0"
+                : "")
              . " WHERE id = :id; ";
         $statement = $pdo -> prepare($sql);
         $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
@@ -193,7 +537,13 @@ function factory_reset_user(object $pdo, int $userId){
     try{
         wipe_record_tables($pdo);
 
-        $sql = "UPDATE users SET balance = 0, categories = '[]', username = '' WHERE id = :id; ";
+        /* Column list owned with the Sprint 15 schema: a factory reset also
+           resets category-type overrides and the confirm-skip flags, so no
+           preference outlives the identity it belonged to. */
+        $sql = "UPDATE users SET balance = 0, categories = '[]',
+                       category_overrides = '{}',
+                       skip_rename_confirm = 0, skip_remove_confirm = 0,
+                       username = '' WHERE id = :id; ";
         $statement = $pdo -> prepare($sql);
         $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
         $statement -> execute();

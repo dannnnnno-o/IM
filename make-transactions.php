@@ -10,7 +10,16 @@ catch(PDOException $e){
 $user = get_user($pdo, 1);
 $userId = (int) $user["id"];
 
-$categories = all_categories($pdo, $userId);
+/* Sprint 14: every pickable category with its allowed modes ("expense" /
+   "income" / "both"). Goal Investment is not in the map — system label,
+   not pickable here. "Other" is pinned last in the picker (user rule). */
+/* Sprint 14: every pickable category with its allowed modes ("expense" /
+   "income" / "both"). Goal Investment is not in the map — system label,
+   not pickable here. "Other" is pinned last in the picker (user rule). */
+$categories = category_type_map($pdo, $userId);   /* name => allowed type */
+$otherType = $categories["Other"] ?? CATEGORY_BOTH;
+unset($categories["Other"]);
+$categories["Other"] = $otherType;
 
 $pageTitle = "Make Transaction";
 $activePage = "update";
@@ -67,8 +76,15 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
     if($form["category"] === ""){
         $errors[] = "Category is required.";
     }
-    elseif(!category_is_known($pdo, $userId, $form["category"])){
-        $errors[] = "Choose a valid category.";
+    else{
+        /* Sprint 14: type-aware check — an unknown name and a known-but-
+           wrong-mode one both land here. An invalid mode already erred
+           above and commits the sticky value to income, so the fallback
+           sign matches what the re-rendered form shows. */
+        $categoryError = category_mode_error($pdo, $userId, $form["category"], $mode ?? "+");
+        if($categoryError !== null){
+            $errors[] = $categoryError;
+        }
     }
 
     if(mb_strlen($form["comment"]) > 500){
@@ -129,12 +145,16 @@ require_once("./partials/sidebar.php");
                         <div class="mb-3">
                             <div class="d-flex align-items-center justify-content-between">
                                 <label class="form-label" for="category">Category</label>
-                                <button type="button" class="btn-add-category" data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add Category</button>
+                                <span class="d-flex align-items-center gap-3">
+                                    <a href="/settings.php#manage-categories" class="btn-add-category text-decoration-none">Manage Categories</a>
+                                    <button type="button" class="btn-add-category" data-bs-toggle="modal" data-bs-target="#addCategoryModal">+ Add Category</button>
+                                </span>
                             </div>
                             <select class="form-select" id="category" name="category" required>
                                 <option value="" disabled <?= $form["category"] === "" ? "selected" : "" ?>>Choose a category&hellip;</option>
-                                <?php foreach($categories as $categoryName): ?>
+                                <?php foreach($categories as $categoryName => $categoryType): ?>
                                     <option value="<?= htmlspecialchars($categoryName) ?>"
+                                        data-type="<?= $categoryType ?>"
                                         <?= $form["category"] === $categoryName ? "selected" : "" ?>>
                                         <?= htmlspecialchars($categoryName) ?>
                                     </option>
@@ -172,6 +192,15 @@ require_once("./partials/sidebar.php");
                             <input type="text" class="form-control" id="newCategoryName"
                                    maxlength="30" placeholder="e.g. School, Savings, etc.">
                             <div class="form-text"><span id="newCategoryCount">0</span>/30 characters</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="newCategoryType">Type</label>
+                            <select class="form-select" id="newCategoryType">
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                                <option value="both">Both</option>
+                            </select>
+                            <div class="form-text">Controls which transaction modes can use this category.</div>
                         </div>
                         <div id="addCategoryError" class="alert alert-danger py-2 mb-0 d-none" role="alert"></div>
                     </form>
@@ -214,11 +243,48 @@ require_once("./partials/sidebar.php");
     var errorBox = document.getElementById("addCategoryError");
     var modalEl = document.getElementById("addCategoryModal");
     var categorySelect = document.getElementById("category");
+    var modeSelect = document.getElementById("mode");
+    var newTypeSelect = document.getElementById("newCategoryType");
+
+    /* Sprint 14: the picker only shows categories whose type allows the
+       selected transaction mode ("both" ones always). A stale selection
+       goes back to the placeholder instead of silently swapping, and the
+       server re-checks the pair on POST, so this is UX only. */
+    function applyModeFilter(){
+        var transactionKind = modeSelect.value === "expense" ? "expense" : "income";
+
+        for(var i = 0; i < categorySelect.options.length; i++){
+            var option = categorySelect.options[i];
+            var optionType = option.getAttribute("data-type");
+
+            if(optionType !== null){
+                option.hidden = !(optionType === "both" || optionType === transactionKind);
+            }
+        }
+
+        var selected = categorySelect.selectedOptions[0];
+        if(selected && selected.hidden){
+            categorySelect.value = "";   /* back to the placeholder */
+        }
+    }
+
+    modeSelect.addEventListener("change", applyModeFilter);
+    applyModeFilter();
 
     if(addForm){
         addForm.addEventListener("submit", function(event){
             event.preventDefault();
             saveButton.click();
+        });
+    }
+
+    /* The modal's Type field defaults to the transaction mode that is
+       selected on the form when it opens (decision: default to mode,
+       still switchable to Both). Fires at click time, when the bundle
+       behind show.bs.modal is already loaded. */
+    if(modalEl && newTypeSelect){
+        modalEl.addEventListener("show.bs.modal", function(){
+            newTypeSelect.value = (modeSelect && modeSelect.value === "expense") ? "expense" : "income";
         });
     }
 
@@ -240,6 +306,9 @@ require_once("./partials/sidebar.php");
 
             var payload = new FormData();
             payload.append("name", name);
+            if(newTypeSelect){
+                payload.append("type", newTypeSelect.value);
+            }
 
             fetch("/categories.php", { method: "POST", body: payload })
                 .then(function(response){
@@ -264,9 +333,20 @@ require_once("./partials/sidebar.php");
 
                     if(!existing){
                         existing = new Option(name, name);
+                        existing.setAttribute("data-type", (newTypeSelect && newTypeSelect.value) || "both");
                         categorySelect.add(existing);
                     }
-                    existing.selected = true;
+
+                    /* Re-filter first so a newly typed category lands only
+                       when it is legal for the current mode; otherwise the
+                       placeholder stays (server would reject the POST). */
+                    applyModeFilter();
+                    if(existing.hidden){
+                        categorySelect.value = "";
+                    }
+                    else{
+                        existing.selected = true;
+                    }
 
                     nameBox.value = "";
                     nameCount.textContent = "0";
