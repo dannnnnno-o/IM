@@ -107,14 +107,14 @@ require_once("./partials/sidebar.php");
                     $goal_msg;
                     switch ($totalGoals) {
                         case 0:
-                            $goal_msg = "<a href=\"/goals.php?set=goal\">Set a goal</a> to get started.";
+                            $goal_msg = "<a style=\"text-decoration: none;\" href=\"/goals.php?set=goal\">Set a goal</a> to get started.";
                             break;
                         
                         case 1:
-                            $goal_msg = "Keep working towards your goal :>";
+                            $goal_msg = "Keep working towards your <a style=\"text-decoration: none;\" href=\"/goals.php\">goal</a> :>";
                             break;
                         default: 
-                            $goal_msg = "Keep working toward your goals :>";
+                            $goal_msg = "Keep working toward your <a style=\"text-decoration: none;\" href=\"/goals.php\"goals</a> :>";
                             break;
                     }
                     echo $goal_msg;
