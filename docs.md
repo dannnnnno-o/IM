@@ -16,8 +16,10 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 > Completed card sections, card-state-machine actions; invest floor in
 > §8). Sprint 11 (29 Oct) added the **responsive pass**: pickers and the
 > Summary split hold to real breakpoints, the mobile topbar is a
-> single-row snap-scroll strip, and the dead Logout strip was removed
-> (settings tab planned in its place). The DB was wiped and re-seeded
+> single-row snap-scroll strip, and the dead Logout strip was removed.
+> Sprint 12 (29 Oct) shipped the **Settings tab**: in-product rename,
+> "Clear data & reset balance" (optional custom-category wipe), and a
+> factory-reset "Delete account" — see §6, §8 and Sprint 12 below. The DB was wiped and re-seeded
 > fresh 26 Oct, then loaded with the
 > human's real demo data — see the Sprint 7/9 state notes. See §14 for
 > what remains deferred and §0 for session history.
@@ -363,6 +365,91 @@ session can again restore context from this file alone.
   the human's own manual SQL testing between sessions; the §15 equation
   still passes (0 = 0), treat as re-demo noise, not app output.
 
+### Sprint 12 — Settings tab (29 Oct 2026, newest)
+- New `/settings.php` — sixth sidebar tab (`partials/sidebar.php` gained
+  the item; the Sprint 11 snap keeps the active chip visible in the
+  mobile strip). The page gates like the dashboard: an unnamed visit
+  302s to `/`. Layout: **Profile** card (rename form) + **Danger Zone**
+  card (two destructive tiles) with confirm modals inline in the file —
+  a deliberate single-consumer exception to the shared-partial pattern
+  (`goal-modals.php` exists only because two goals code paths share it).
+- **Rename (`action=profile`)**: validation identical to the landing
+  (§8) — "Name is required." / "Name must be
+  " . MAX_USERNAME_LENGTH . " characters or fewer." — single-sourced via
+  the shared const; the write is `save_username()` (prepared, username
+  ONLY, balance/categories untouched). Failure re-renders with the input
+  kept; success 302s `?saved=profile` → "Name updated." Reversible, so
+  no confirm modal here — only the Danger Zone earns one.
+- **Wipe implementation (model.php)**: `wipe_record_tables()` deletes
+  transactions → goal_investments → goals → archived_goals (static
+  names) **inside the PDO transaction; TRUNCATE is deliberately NOT
+  used** — MariaDB implicitly commits on DDL, which would break §7's
+  all-or-nothing rule. `clear_records_and_balance($pdo, $id,
+  $alsoClearCategories)` zeroes the balance and wipes `categories` only
+  when the modal checkbox is ticked (default keeps them). 
+  `factory_reset_user()` is the full wipe PLUS balance 0, categories
+  `'[]'`, username `''` — the users row itself must SURVIVE (§7: every
+  route is `get_user($pdo, 1)` and the landing gate is "name empty", not
+  "row absent"), so "Delete account" means the documented factory reset:
+  the gate reopens and the POST redirects to `/`. Counter freshness is
+  `reset_record_counters()` — `ALTER TABLE … AUTO_INCREMENT = 1` on the
+  four tables, run AFTER commit (same DDL-implicit-commit reason), shared
+  by both actions.
+- **Modal copy names the blast radius**: server-rendered live counts
+  ("This permanently erases N transactions and M goals — including their
+  fund history — and resets your balance to ₱0."). Standard dark modals
+  opened purely via `data-bs-toggle` (zero bootstrap JS at parse time);
+  one tiny vanilla script reveals "Your custom categories will also be
+  erased. This cannot be undone." while the checkbox is ticked. Footer
+  order and `.btn-outline-danger` confirm mirrors `goalDeleteModal`.
+- **QA on the live data, restored bit-exact** from a pre-QA
+  `mysqldump --ssl=0 … > /tmp/opencode/settings-qa-pre.sql` snapshot
+  (dump+restore is the new §11 convention for destructive-action testing
+  — the seeded INSERTs also restore the AUTO_INCREMENT counters).
+  Verified: rename blank/51-char rejected with no write, valid rename
+  confirmed then rolled back by the restore; unknown action renders 200
+  + "Choose a valid action."; **clear unchecked** → counts 0, balance 0,
+  categories byte-identical, next id 1, drift 0, flash "All records
+  cleared."; **clear checked** → `categories = '[]'` (JSON valid, length
+  0); **factory reset while named** → 302 `/`, landing serves the prompt
+  (200), `/settings.php` now gate-bounces 302, counters reset to 1,
+  drift 0. CDP at true 360 (settings-qa.mjs): modal opens, warning
+  reveals/hides with the checkbox, active Settings chip snapped into
+  view, live counts interpolated ("12 transactions and 1 goal… ₱0").
+  §15 route matrix re-run clean; goal sanity still 0 = 0 after restore.
+- **No CSS change** — Bootstrap utilities only, CSS_VERSION stays
+  `20261029-1`.
+- **Amendment (later 29 Oct, user request)**: the Clear modal's checkbox
+  hint is now a live preview — "Custom Categories: <names>" lists at most
+  `CATEGORY_PREVIEW_LIMIT` (4, mid of the user's 3–5 range) custom
+  categories via the sanctioned `get_custom_categories()`, followed by
+  `" ..."` when more exist; an empty list reads "none". Names render
+  `htmlspecialchars()`-escaped (§10). QA'd all paths on live data with the
+  blob restored exactly after each: 1 name, 6 names (first 4 + ellipsis,
+  5th/6th never rendered), empty, and an injected `<script>` payload that
+  rendered inert.
+- **Amendment (later 29 Oct, user request)**: with zero custom categories
+  the Clear-modal checkbox is **disabled** and a hover tooltip (top
+  placement, exact copy "No Custom Categories can be cleared.") explains
+  why. **Gotcha of record**: the §6c wrapper-span-on-disabled-button
+  pattern does NOT transfer to the checkbox — `.form-check-input` is
+  `position:absolute`, so an inline wrapper span collapses to a zero box
+  and Chromium hovers the (sibling) label while the disabled input swallows
+  events without retargeting; CDP hover over the wrapper never fired and a
+  manual `.show()` was the only thing that worked before relocation. The
+  tooltip therefore anchors on the whole `.form-check` row — a real
+  in-flow element whose `mouseenter` is dependable — which also reads
+  better (hovering anywhere on the option explains it). Verified via CDP
+  hover (settings-qb.mjs): tooltip in DOM with the exact text; enabled
+  state renders zero tooltip strings and no `disabled` attr. The only
+  custom-JS change was extending the existing script block's
+  DOMContentLoaded tooltip init (house `getOrCreateInstance` pattern).
+- **Live state moved on 29 Oct evening**: the human exercised the app
+  themselves — account renamed **'Daniel'**, balance **0**, and the data
+  wiped via the new Settings flows themselves (counts 0/0/0, drift 0,
+  sanity 0 = 0, categories `["Allowance"]`). All live-state readouts must
+  come from §15 queries, as stated above.
+
 ### Current state at session end
 - DB right now (**29 Oct 2026, after Sprint 11**): `users` id=1 — username
   **'Dan'**, balance 36, categories `["Allowance"]`; the landing is NOT
@@ -492,6 +579,11 @@ cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js vendor/bootstrap/
 ├── goals.php            route: goal list (progress cards, Set/Edit modal) + ALL
 │                         actions on the cards (invest/take-back/edit/delete/
 │                         complete; no detail page), `?set=goal` opens the modal
+├── settings.php         route: Profile rename + Danger Zone (Sprint 12):
+│                         Clear data & reset balance (optional custom-category
+│                         wipe via modal checkbox) + factory-reset Delete
+│                         account; BOTH destructive actions behind confirm
+│                         modals, page gates like the dashboard
 ├── db.php               PDO connection
 ├── model.php            all queries + formatting helpers
 ├── partials/
@@ -624,6 +716,7 @@ originals failed AA as text.
 | `/summary.php` | done | Daily/Weekly/Monthly toggle, date picker, sectioned Income (top) / Expense (bottom) summaries — each with its own donut + breakdown table — plus a Net (income − expense) card; goal transfers included in both |
 | `/categories.php` | done | JSON endpoint. POST `name=` → 201/400; GET → **405** |
 | `/goals.php` | done | goal list (On-going/Completed sections) + ALL actions on cards: invest, take back, complete (confirm modal), edit, delete (blocked while invested); dashboard's "Set a goal" deep-links via `?set=goal` → Set modal opens immediately (Sprint 9) |
+| `/settings.php` | done | Profile rename + Danger Zone (Sprint 12): Clear data & reset balance (optional custom-category wipe via its modal checkbox) and factory-reset Delete account (→ back to the landing); every destructive write is behind a confirm modal; unnamed visits 302 → `/` |
 
 **Landing page (Sprint 7, 26 Oct):** the earlier "No Landing Page" decision
 was overturned once the panelist expectation became concrete (tasks.txt's
@@ -643,7 +736,10 @@ final build item). Rules of record:
   `UPDATE users SET username = '' WHERE id = 1;`
 - POST handling runs only behind the open gate — once named, `/` redirects
   before reading POST, so the landing cannot be used to rename. Renaming
-  is a SQL-only path by design (no profile/renaming feature exists).
+  used to be SQL-only by design; since Sprint 12 (29 Oct) named users
+  rename in-product via the Settings tab's Profile form (POST
+  `/settings.php`, `action=profile` — same validation, same
+  `save_username()`). The landing still cannot rename.
 - **Confirm-before-lock modal (Sprint 8, from `landing-page.png`)**:
   Confirm opens the app's standard dark modal with the typed name
   interpolated via `textContent` and the mockup's "cannot be changed yet"
@@ -916,6 +1012,21 @@ rejected rather than silently rolling into March.
 > it returned results for the *opposite* range while the inputs still displayed
 > the originals. Never silently reinterpret user input; show the error.
 
+### Settings (Sprint 12, 29 Oct 2026)
+| Case | Message / Behaviour |
+|---|---|
+| unknown `action` | re-render 200: `Choose a valid action.` |
+| name blank / whitespace-only | `Name is required.` |
+| name > 50 chars (`mb_strlen`, `MAX_USERNAME_LENGTH`) | `Name must be 50 characters or fewer.` |
+| valid rename | `save_username()` → 302 `?saved=profile` → flash "Name updated." (failure re-renders with the input kept) |
+| `clear` POST | wipes transactions / goal_investments / goals / archived_goals + balance → 0 (categories → `'[]'` only iff the modal checkbox posts `clear_categories`), counters → 1, → 302 `?saved=cleared` |
+| `reset` POST | factory reset (everything incl. name + categories) → 302 `/` — the landing prompt returns |
+
+> The destructive actions carry no re-render path: there is nothing to
+> validate — the confirm modal IS the gate, and both writes are
+> all-or-nothing inside the PDO transaction (§7). Counter reset is DDL and
+> runs after commit. The unnamed gate mirrors dashboard.php (302 → `/`).
+
 ### Goals (revised 26 Oct 2026 — single route `/goals.php`)
 | Case | Behaviour |
 |---|---|
@@ -1091,6 +1202,20 @@ Safe rules for future sessions:
    to its pre-test JSON (snapshot it — there is no removal endpoint, so the
    restore is a direct UPDATE of that blob only).
 
+**Destructive-action QA (Sprint 12 convention): for tests that wipe the
+database for real** — the Settings Tab's Clear/factory-reset POSTs — snapshot
+first and restore after:
+
+```bash
+mysqldump --ssl=0 -h 127.0.0.1 -u user jbudget \
+  users transactions goals goal_investments archived_goals > /tmp/qa-pre.sql
+mysql --ssl=0 -h 127.0.0.1 -u user jbudget < /tmp/qa-pre.sql   # exact restore
+```
+
+The dump's INSERTs restore row ids AND the AUTO_INCREMENT counters, so a
+restore is bit-exact including id numbering. (/tmp is mortal — re-dump
+before every destructive test rather than trusting an old snapshot.)
+
 For UI verification, headless Chromium is available and driven over the DevTools
 protocol — this catches things curl cannot, like a CSS specificity bug where the
 HTML is correct but the computed colour is wrong:
@@ -1139,12 +1264,13 @@ adding before submission.
   carry the same data.
 - The Daily/Weekly/Monthly toggle is a real button group with
   `aria-current="page"` on the active option.
-- All nav items are real `<a href>` links now (no unbuilt/SOON entries
+- All nav items are real `<a href>` links now (six tabs incl. Settings; no
+  unbuilt/SOON entries
   remain). The old disabled-span pattern (`<span class="nav-link
   is-disabled">` with no `href`, screen readers get the label rather than a
   dead link) is what we'd use again if a future tab ships before its page —
-  the Logout strip was removed entirely 29 Oct (Sprint 11; single-account,
-  a Settings tab will take its place, see §14).
+  the Logout strip was removed entirely (Sprint 11; single-account) and the
+  Settings tab now holds the profile/data controls (Sprint 12).
 
 ---
 
@@ -1190,9 +1316,6 @@ remaining screens (5–7) are now built — **the build is complete**.
   decision, 29 Oct): table-responsive scrolling stays for now; the card
   layout replaces it **on the user's signal**, then as the final item of
   the responsive work (docs §13 #1).
-- **Settings tab** (user idea, 29 Oct): replaces the removed Logout strip —
-  edit the name (today rename-permission is SQL-only), reset data, fully
-  delete the account. Not designed yet.
 - **Delete-archive for goals (user idea, 26 Oct)**: user noted that making
   Delete possible even for funded/completed goals is attainable if deleted
   goals go to an archive instead of vanishing — out of scope for now; until
@@ -1220,9 +1343,9 @@ for f in *.php partials/*.php; do php -l "$f"; done
 # goal-details.php must be GONE (404) after the 26 Oct removal).
 # "/" and /dashboard.php are conditional on users.username (first-visit
 # gate, Sprint 7 / §6):
-#   unnamed:  "/" 200 (landing form)  /  dashboard.php 302 -> /
-#   named:    "/" 302 -> /dashboard.php  /  dashboard.php 200
-for r in /dashboard.php /make-transactions.php /history.php "/history.php?view=weekly" \
+#   unnamed:  "/" 200 (landing form)  /  dashboard.php + settings.php 302 -> /
+#   named:    "/" 302 -> /dashboard.php  /  dashboard.php + settings.php 200
+for r in /settings.php /dashboard.php /make-transactions.php /history.php "/history.php?view=weekly" \
          "/history.php?type=expense&view=monthly" "/history.php?type=goal" /summary.php \
          "/summary.php?view=weekly" "/summary.php?view=monthly" "/summary.php?view=bogus" \
          /goals.php "/goal-details.php?id=4"; do

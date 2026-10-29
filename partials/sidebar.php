@@ -7,6 +7,7 @@ $navItems = [
     ["key" => "history",   "label" => "Transaction History", "href" => "/history.php"],
     ["key" => "summary",   "label" => "Summary",           "href" => "/summary.php"],
     ["key" => "goals",     "label" => "Goals",             "href" => "/goals.php"],
+    ["key" => "settings",  "label" => "Settings",          "href" => "/settings.php"],
 ];
 ?>
 <aside class="app-sidebar">

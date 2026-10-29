@@ -140,6 +140,78 @@ function save_username(object $pdo, int $userId, string $name){
     $statement -> execute();
 }
 
+/* ---- Settings wipe actions (Sprint 12, 29 Oct 2026) ---------------------- */
+
+/* Shared DELETE over the four data tables. Needs an open PDO transaction
+   (house pattern, like insert_transaction). Table names are static here —
+   never user input, so no count_rows() allowlist is needed. */
+function wipe_record_tables(object $pdo){
+    foreach(["transactions", "goal_investments", "goals", "archived_goals"] as $table){
+        $pdo -> prepare("DELETE FROM $table; ") -> execute();
+    }
+}
+
+/* "Clear data & reset balance" (Settings): erases every record and zeroes
+   the balance, keeping the name; the custom categories survive unless
+   $alsoClearCategories (the modal checkbox). One transaction — a failure
+   must leave nothing half-wiped (§7). */
+function clear_records_and_balance(object $pdo, int $userId, bool $alsoClearCategories){
+    $pdo -> beginTransaction();
+
+    try{
+        wipe_record_tables($pdo);
+
+        $sql = "UPDATE users SET balance = 0"
+             . ($alsoClearCategories ? ", categories = '[]'" : "")
+             . " WHERE id = :id; ";
+        $statement = $pdo -> prepare($sql);
+        $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+        $statement -> execute();
+
+        $pdo -> commit();
+        return true;
+    }
+    catch(PDOException $e){
+        $pdo -> rollBack();
+        throw $e;
+    }
+}
+
+/* "Delete account (factory reset)" (Settings): the users row must keep
+   existing (§7 — every route is get_user($pdo, 1) and the landing gate is
+   "username empty", not "row absent"), so a delete MEANS the full wipe plus
+   clearing the identity: balance 0, categories [], username ''. The gate
+   then re-opens and the app reads as a fresh install. */
+function factory_reset_user(object $pdo, int $userId){
+    $pdo -> beginTransaction();
+
+    try{
+        wipe_record_tables($pdo);
+
+        $sql = "UPDATE users SET balance = 0, categories = '[]', username = '' WHERE id = :id; ";
+        $statement = $pdo -> prepare($sql);
+        $statement -> bindParam(":id", $userId, PDO::PARAM_INT);
+        $statement -> execute();
+
+        $pdo -> commit();
+        return true;
+    }
+    catch(PDOException $e){
+        $pdo -> rollBack();
+        throw $e;
+    }
+}
+
+/* Counter reset AFTER the wipe commits — ALTER TABLE is DDL and implicitly
+   commits in MariaDB, so it can never share the transaction above (same
+   reason TRUNCATE is deliberately not used in wipe_record_tables). Static
+   table names; gives demo-fresh id numbering after Clear / factory reset. */
+function reset_record_counters(object $pdo){
+    foreach(["transactions", "goal_investments", "goals", "archived_goals"] as $table){
+        $pdo -> prepare("ALTER TABLE $table AUTO_INCREMENT = 1; ") -> execute();
+    }
+}
+
 function get_recent_transactions(object $pdo, int $limit = 5){
     $limit = max(1, (int) $limit);
 
