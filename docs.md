@@ -5,16 +5,18 @@ Information Management project. Submitted by **Daniel Z. Baladad**.
 
 Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
-> Last updated: **26 Oct 2026 (late)** · Status: **Every feature from the
+> Last updated: **27 Oct 2026 (evening)** · Status: **Every feature from the
 > proposal is live**: the **Landing page** (first-visit name prompt,
-> Sprints 7–8) at `/`, Dashboard, "Make Transaction"
-> (`/make-transactions.php`, renamed 26 Oct), History (period picker +
+> Sprints 7–8) at `/`, Dashboard (Sprint 9: today-only income/expense
+> stat cards + "Set a goal" deep link), "Make Transaction" (Sprint 10:
+> balance floor on expenses), History (period picker +
 > Income/Expense/**Goal** type filter), Summary (**sectioned**: Income
 > Summary on top / Expense Summary below + Net card, two donuts),
 > Categories endpoint, and **Goals** (single route `/goals.php`: On-going /
-> Completed card sections, card-state-machine actions). The DB was wiped
-> and re-seeded fresh 26 Oct — see Sprint 7. See §14 for what
-> remains deferred and §0 for session history.
+> Completed card sections, card-state-machine actions; invest floor in
+> §8). The DB was wiped and re-seeded fresh 26 Oct, then loaded with the
+> human's real demo data — see the Sprint 7/9 state notes. See §14 for
+> what remains deferred and §0 for session history.
 
 ---
 
@@ -22,8 +24,8 @@ Single-account context. Currency is **PHP (₱)**. Amounts are integers only.
 
 For the agent picking this up: sprints 1–7 are the dated log of everything
 that shipped, newest at the bottom. The list of *what shipped* doubles as
-the list of *what may surprise you*. Start at **Sprint 8**, then
-**Sprint 7**, then **Sprint 6** (all 26 Oct) — they changed the most —
+the list of *what may surprise you*. Start at **Sprint 10**, then
+**Sprint 9**, then **Sprints 6–8** (26–27 Oct) — they changed the most —
 then read **Current state at session end** below it.
 
 ### Sprint 1 — Summary route + categories
@@ -227,21 +229,97 @@ then read **Current state at session end** below it.
   (screenshot at `/tmp/opencode/landing-modal.png`), Go Back → closed,
   still unnamed, input kept; Proceed → dashboard greeting; drift 0.
   After QA, `users.username` was restored to '' — the landing is live
-  for the demo, as decided in Sprint 7.
+  for the demo, as decided in Sprint 7. (Superseded 27 Oct: the human
+  renamed the account to 'Dan' and exercised the live flow — see the
+  Sprint 9 state note.)
+
+### Sprint 9 — Dashboard stat cards + goals deep link (26–27 Oct 2026, newest)
+- Dashboard stat cards (the row under the balance card) changed from
+  "This Week/Month · Expenses" to **Today · Income** (now green,
+  `stat-income`) and **Today · Expenses** (red, `stat-expense`), each
+  dated `$today->format("F j")` — "October 27" style, **month + day
+  only, no year** (user spec). The `week_range`/`month_range` calls
+  left dashboard.php; Summary/History pickers keep their own logic via
+  `resolve_period()`, untouched.
+- Total Goals card message: the human's own `goal_msg` switch (0 goals
+  → anchor "Set a goal", 1 → "Keep working towards your goal :>",
+  2+ → "toward your goals :>") — kept verbatim as user-authored code.
+- **"Set a goal" deep link**: the anchor targets `/goals.php?set=goal`;
+  goals.php arms the existing `$reopenGoalModal` flag on that GET, so
+  the Goals tab lands with the Set/Edit modal already open ("Set New
+  Goal" title, empty fields). `history.replaceState` strips the param
+  once the modal opens so a refresh stays quiet; unknown `set` values
+  are ignored; the flag is GET-only, so a failed goal_save POST
+  re-renders without the param and the two reopen paths can't interact
+  (regression-verified via curl: invalid goal_save still re-opens with
+  "Name is required."). No CSS change — CSS_VERSION stays `20261026-3`.
+- QA straddled the reboot. On the 26th the card math was proven with
+  real POSTs: seeded QA income 500 + expense 200 on top of the human's
+  own +181 Allowance read Today's Income **₱681** / Expenses ₱200.
+  After the human's own cleanup (QA rows + "QA Pass" username removed,
+  account renamed 'Dan'), the 27th re-check showed both Today cards at
+  **₱0 with "October 27"** labels while the Oct-26 rows stayed in
+  Recent — the today-only semantics exactly as specced. The deep link
+  was proven in-browser via CDP pre-reboot (goals page lands with the
+  modal open, param stripped, fields empty); /tmp then took the
+  screenshot and both scratch scripts with it — the /tmp mortality
+  warning in §13 has now bitten twice; copy any test script to a
+  versioned location if it should outlive a reboot.
+- House QA note (27 Oct update): `peso()` USED to render `&#8369;`
+  entities — greps against those still describe older screenshots and
+  served-HTML facts; since the Sprint 10 fix it emits the raw ₱ glyph,
+  so current QA greps match `₱NNN` instead.
+
+### Sprint 10 — Balance floor + peso() glyph fix (27 Oct 2026 evening, newest)
+- Bug from the user: an invest "input" LARGER than the current balance
+  still invested and the dashboard rendered a NEGATIVE balance (the
+  invest path's only cap was the goal's own target; `users.balance` was
+  never considered). The fix is a stated invariant: **no write may take
+  `users.balance` below zero.** Two route-level guards, one branch each:
+  goals.php's invest arm (after the target-lock check) and
+  make-transactions.php's expense arm (`mode '-'`; income and goal
+  take-back add money and are never floored) — both read the pre-POST
+  `users.balance` already loaded by `get_user()` (single account, no
+  race), no model change. Card disabled states stay keyed on the goal
+  state machine (the take-back cap precedent: server-side rejection IS
+  the UX). Messages mirror the take-back cap family: "You can invest at
+  most ₱{balance}." / "You can spend at most ₱{balance}." — the figure
+  doubles as a live cap readout (balances at ₱0 now read "…₱0.").
+- **peso() glyph fix (27 Oct)** — found while asserting the new floor's
+  message: `peso()` used to emit the TEXT `&#8369;`, and inside
+  `htmlspecialchars()`ed contexts (error alerts) that double-escapes, so
+  the take-back cap message had ALWAYS rendered the literal string
+  '&#8369;0.' in the browser since Sprint 6 (confirmed live byte-for-byte
+  before fixing). `peso()` now returns the actual UTF-8 ₱ glyph
+  (`"\u{20B1}" . number_format(...)`), which escaping passes through
+  untouched; direct-HTML call sites (balance card, breakdowns) were
+  already correct and stay visually identical. One line in model.php.
+- QA on the live data, restore exact (§11): QA goal (target 200) —
+  invest 100 (>36) → re-render "You can invest at most ₱36." NO WRITE;
+  invest 36 (== balance) → 302, balance 0, ledger 36; invest 1 → "…₱0."
+  NO WRITE; take back 36 → restored; MT: expense 50 → "You can spend at
+  most ₱36." NO WRITE; expense 30 → saved; income 100 → saved
+  (unfloored). Cleanup: goal deleted app-side first, QA rows removed by
+  the category/comment markers, balance compensated by the exact QA net
+  (+70), categories blob restored to `["Allowance"]`. Result: the
+  human's six real rows untouched, **drift 0**.
 
 ### Current state at session end
-- DB right now (26 Oct 2026, after the human's wipe + Sprint 7 re-seed):
-  `transactions`, `goals`, `goal_investments`, `archived_goals` are all
-  EMPTY (id counters at 1); `users` is the freshly seeded single row
-  id=1 (balance 0, username '', categories '[]'), **balance drift 0**.
-  The app is deliberately in its first-visit state — `/` serves the
-  landing until the user names themselves, and the dashboard sits
-  behind the same gate. Historical row counts in older bullets (13/14
-  transactions, Sample Goal 4 completed, the +₱200 ledger row) describe
-  the pre-wipe world; none of it exists anymore (the /tmp backups have
-  perished too — the doc warned they would). Trust the live queries in
-  §15, not historical numbers. Live edits are still expected before the
-  demo — snapshot before QA cycles and restore exactly after.
+- DB right now (27 Oct 2026 morning, after the human's own demo session):
+  `users` id=1 — username **'Dan'**, balance 36, categories
+  `["Allowance"]`. `transactions` 6 rows, all dated 2026-10-26: +181
+  Allowance, −25 Transport, −100 Other, −20 Food, and a −250/+250 Goal
+  Investment pair carrying `goal=1` with comments "Invested in / Taken
+  back from GPU · GTX 1660" — the human ran the real goal flow, then
+  deleted the goal, so `goal_investments` is empty while those two
+  transactions stay in history; that is the documented
+  delete-keeps-transactions semantics working live, and the §15 goals
+  sanity equation holds at 0 = 0. `goals`, `goal_investments`,
+  `archived_goals` empty. **balance drift 0**. The landing is NOT
+  visible on `/` while 'Dan' is set — clear `users.username` to re-demo
+  (trick documented in §6). Historical numbers in older bullets
+  describe earlier states; trust the live §15 queries as the demo
+  data evolves — snapshot before QA cycles and restore exactly after.
 - Verified working: routes 200/302 (goal-details 404), landing gate
   (unnamed `/` 200 + dashboard 302; named, both reverse; POSTs to `/` while
   named redirect before write), donut math asserted
@@ -461,12 +539,12 @@ originals failed AA as text.
 | Route | Status | Notes |
 |---|---|---|
 | `/` | done | **Landing page** (Sprint 7): first-visit name prompt while `users.username` is empty; 302 → dashboard once named |
-| `/dashboard.php` | done | balance card, week/month expense cards, goal count, recent 5 |
+| `/dashboard.php` | done | balance card, **today** income/expense stat cards (Sprint 9), goal count + the user's Set-a-goal message, recent 5 |
 | `/make-transactions.php` | done | "Make Transaction" (renamed 26 Oct 2026, ex update-balance.php). POST form → dashboard redirect; category picker + Add Category modal |
 | `/history.php` | done | shared period picker (All Time default + Daily/Week/Month), type filter, pagination, expandable comments |
 | `/summary.php` | done | Daily/Weekly/Monthly toggle, date picker, sectioned Income (top) / Expense (bottom) summaries — each with its own donut + breakdown table — plus a Net (income − expense) card; goal transfers included in both |
 | `/categories.php` | done | JSON endpoint. POST `name=` → 201/400; GET → **405** |
-| `/goals.php` | done | goal list (On-going/Completed sections) + ALL actions on cards: invest, take back, complete (confirm modal), edit, delete (blocked while invested) |
+| `/goals.php` | done | goal list (On-going/Completed sections) + ALL actions on cards: invest, take back, complete (confirm modal), edit, delete (blocked while invested); dashboard's "Set a goal" deep-links via `?set=goal` → Set modal opens immediately (Sprint 9) |
 
 **Landing page (Sprint 7, 26 Oct):** the earlier "No Landing Page" decision
 was overturned once the panelist expectation became concrete (tasks.txt's
@@ -653,6 +731,13 @@ FROM transactions;
 **Always run this after touching the write path.** If it ever reads non-zero,
 the transaction block was bypassed (e.g. a manual `UPDATE users`).
 
+A second invariant (Sprint 10, 27 Oct): the **balance floor** — no write may
+take `users.balance` below zero. It is enforced at the ROUTE level (an
+expense cap and an invest cap against the pre-POST balance, see §8) rather
+than inside the write helpers — a manual SQL insert can still violate it,
+and the drift query above stays the authoritative write-block check while
+the floor is a validation rule.
+
 ---
 
 ## 8. Validation rules
@@ -668,6 +753,7 @@ the transaction block was bypassed (e.g. a manual `UPDATE users`).
 | category | must exist in predefined ∪ custom | "Choose a valid category." |
 | comment | optional | — |
 | comment | `mb_strlen() > 500` | "Comment must be 500 characters or fewer." |
+| expense (mode `-`) | `amount` > current `users.balance` (Sprint 10) | "You can spend at most ₱…" |
 
 `ctype_digit()` rejects `-5`, `10.5`, `abc`, `1e5` and `0x10` in one shot,
 because none of those are decimal digit strings. That single check is why those
@@ -764,6 +850,7 @@ rejected rather than silently rolling into March.
 | `invest` on a 100% goal | blocked (button disabled + server stop): `The goal has reached its target amount. Mark it complete or take funds back.` |
 | `invest`/`takeback` on a completed goal | blocked: `That goal is already completed.` |
 | `takeback` amount > net invested | error: `You can take back at most ₱….`, query skipped |
+| `invest` amount > balance (Sprint 10) | floor cap: `You can invest at most ₱…`, query skipped — the figure doubles as the balance readout |
 | `takeback` with ₱0 invested | blocked on the card (button disabled, hover hint); server cap equation also rejects |
 | `complete` below 100% | blocked (button not shown): `The goal has not reached its target amount yet.` |
 | `complete` at 100% | confirm modal → `mark_goal_complete()`: `completed=1`, `date_completed=CURDATE()` → flash "Marked as complete." |
@@ -855,6 +942,22 @@ renders on Weekly/Monthly too, just hidden) — fatal 500 on Weekly and Monthly,
 while Daily passed all checks. Fix: initialize branch-only variables **before**
 the branch if any shared markup reads them. Any time you add a control that
 only renders in one mode, grep the render section for everything it touches.
+
+### 4. A reboot can stale-date MariaDB's TLS cert for CLI clients (27 Oct 2026)
+
+Overnight-reboot symptom: every `mysql` CLI call failed with
+`ERROR 2026 (HY000): TLS/SSL error: certificate is not yet valid or the
+system clock is incorrect` — while the system clock and NTP were both
+correct (`timedatectl` sane, OS date right). The MariaDB auto-managed TLS
+certificate's NotBefore had drifted into the future at boot; only the
+CLI's handshake enforces the check, so **the app was never affected** (the
+PDO connection kept working — `get_user()` and all routes normal).
+Workaround: connect with TLS off — `mysql --ssl=0 -h 127.0.0.1 -u user
+jbudget` (the §1 command needs this suffix until the cert is regenerated).
+Proper fix later: regenerate the server certs or disable TLS for
+localhost — the files are root-owned, so it needs sudo. Symptom
+signature: CLI-only DB auth failures immediately after a reboot with a
+provably correct clock.
 
 ---
 

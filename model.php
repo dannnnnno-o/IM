@@ -199,7 +199,11 @@ function month_range(DateTimeImmutable $today){
 }
 
 function peso(int $amount){
-    return "&#8369;" . number_format($amount);
+    /* The actual UTF-8 ₱ glyph, not an HTML entity: peso() output passes
+       through htmlspecialchars() inside error alerts and attribute values,
+       where an entity double-escapes — the take-back cap message used to
+       render the literal string '&#8369;0.' in the browser (fixed 27 Oct). */
+    return "\u{20B1}" . number_format($amount);
 }
 
 function mode_label(string $mode){

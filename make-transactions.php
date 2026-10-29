@@ -49,6 +49,14 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
         $amount = (int) $form["amount"];
     }
 
+    /* Balance floor (27 Oct): an expense cannot exceed the money on hand —
+       the balance is a cached sum and would render negative otherwise.
+       Income is never floored; an amount error above already reported, so
+       the floor stays silent ($amount is null only after an amount error). */
+    if($mode === "-" && $amount !== null && $amount > (int) $user["balance"]){
+        $errors[] = "You can spend at most " . peso((int) $user["balance"]) . ".";
+    }
+
     if($form["category"] === ""){
         $errors[] = "Category is required.";
     }

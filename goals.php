@@ -197,6 +197,12 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
                 /* Invest locks at 100%: the user marks completion instead. */
                 $errors[] = "The goal has reached its target amount. Mark it complete or take funds back.";
             }
+            elseif(empty($errors) && (int) $amountInput > (int) $user["balance"]){
+                /* Balance floor (27 Oct): an invest cannot exceed the money on
+                   hand — the balance is a cached sum and would render negative
+                   otherwise. Mirrors the take-back cap message above. */
+                $errors[] = "You can invest at most " . peso((int) $user["balance"]) . ".";
+            }
 
             if(empty($errors)){
                 record_goal_investment(
