@@ -13,7 +13,7 @@
      prefill the same single modal.
    - Row "Delete" buttons carry data-goal-delete + data-goal-* attributes
      which prefill the confirm modal. */
-$goalModalAction = $goalModalAction ?? "/goals.php";
+$goalModalAction = $goalModalAction ?? app_url("goals.php");
 $form = $form ?? ["id" => "", "name" => "", "target_amount" => "", "target_date" => ""];
 $errors = $errors ?? [];
 $reopenGoalModal = !empty($reopenGoalModal);
@@ -175,7 +175,7 @@ $reopenGoalModal = !empty($reopenGoalModal);
            quiet; a failed-POST reopen has no param in the URL to begin with,
            so this rewrite is a no-op there. */
         if(window.history && window.history.replaceState){
-            window.history.replaceState(null, "", "/goals.php");
+            window.history.replaceState(null, "", <?= json_encode(app_url("goals.php")) ?>);
         }
     });
     <?php endif; ?>

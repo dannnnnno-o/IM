@@ -87,7 +87,7 @@ $expenseDonut = sum_donut($expenseRows, "-", $chartColors);
 $net = $incomeDonut["total"] - $expenseDonut["total"];
 
 $periodConfig = [
-    "action" => "/summary.php",
+    "action" => app_url("summary.php"),
     "allowAllTime" => false,
     "allTimeActive" => false,
 ];

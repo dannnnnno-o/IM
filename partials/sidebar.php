@@ -2,12 +2,12 @@
 $activePage = $activePage ?? '';
 
 $navItems = [
-    ["key" => "dashboard", "label" => "Dashboard",         "href" => "/dashboard.php"],
-    ["key" => "update",    "label" => "Make Transaction", "href" => "/make-transactions.php"],
-    ["key" => "history",   "label" => "Transaction History", "href" => "/history.php"],
-    ["key" => "summary",   "label" => "Summary",           "href" => "/summary.php"],
-    ["key" => "goals",     "label" => "Goals",             "href" => "/goals.php"],
-    ["key" => "settings",  "label" => "Settings",          "href" => "/settings.php"],
+    ["key" => "dashboard", "label" => "Dashboard",         "href" => app_url("dashboard.php")],
+    ["key" => "update",    "label" => "Make Transaction", "href" => app_url("make-transactions.php")],
+    ["key" => "history",   "label" => "Transaction History", "href" => app_url("history.php")],
+    ["key" => "summary",   "label" => "Summary",           "href" => app_url("summary.php")],
+    ["key" => "goals",     "label" => "Goals",             "href" => app_url("goals.php")],
+    ["key" => "settings",  "label" => "Settings",          "href" => app_url("settings.php")],
 ];
 ?>
 <aside class="app-sidebar">

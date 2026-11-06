@@ -13,7 +13,7 @@ $user = get_user($pdo, 1);
    has not been completed yet — bounce there instead of greeting "" with a
    null balance. Other routes don't read the name, so only this page gates. */
 if(username_is_missing($user)){
-    header("Location: /");
+    header("Location: " . app_url());
     exit;
 }
 
@@ -79,7 +79,7 @@ require_once("./partials/sidebar.php");
                 <div class="balance-amount"><?= peso($user["balance"]) ?></div>
             </div>
         </div>
-        <a class="btn btn-primary balance-cta" href="/make-transactions.php">Make Transaction</a>
+        <a class="btn btn-primary balance-cta" href="<?= htmlspecialchars(app_url("make-transactions.php")) ?>">Make Transaction</a>
     </section>
 
     <div class="row g-3 mb-4">
@@ -107,14 +107,14 @@ require_once("./partials/sidebar.php");
                     $goal_msg;
                     switch ($totalGoals) {
                         case 0:
-                            $goal_msg = "<a style=\"text-decoration: none;\" href=\"/goals.php?set=goal\">Set a goal</a> to get started.";
+                            $goal_msg = "<a style=\"text-decoration: none;\" href=\"" . htmlspecialchars(app_url("goals.php?set=goal")) . "\">Set a goal</a> to get started.";
                             break;
                         
                         case 1:
-                            $goal_msg = "Keep working towards your <a style=\"text-decoration: none;\" href=\"/goals.php\">goal</a> :>";
+                            $goal_msg = "Keep working towards your <a style=\"text-decoration: none;\" href=\"" . htmlspecialchars(app_url("goals.php")) . "\">goal</a> :>";
                             break;
                         default: 
-                            $goal_msg = "Keep working toward your <a style=\"text-decoration: none;\" href=\"/goals.php\">goals</a> :>";
+                            $goal_msg = "Keep working toward your <a style=\"text-decoration: none;\" href=\"" . htmlspecialchars(app_url("goals.php")) . "\">goals</a> :>";
                             break;
                     }
                     echo $goal_msg;
@@ -128,7 +128,7 @@ require_once("./partials/sidebar.php");
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h2 class="h5 mb-0">Recent Transactions</h2>
-                <a href="/history.php" class="btn btn-sm btn-outline-secondary">View All</a>
+                <a href="<?= htmlspecialchars(app_url("history.php")) ?>" class="btn btn-sm btn-outline-secondary">View All</a>
             </div>
 
             <?php if(empty($recent)): ?>

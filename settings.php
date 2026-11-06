@@ -13,7 +13,7 @@ $userId = (int) $user["id"];
 /* First-visit gate, same as the dashboard (§6): Settings is a named-user
    page — an unnamed account belongs on the landing prompt. */
 if(username_is_missing($user)){
-    header("Location: /");
+    header("Location: " . app_url());
     exit;
 }
 
@@ -107,7 +107,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
             /* save_username() writes username ONLY (prepared) — balance and
                categories are untouched, same as the landing flow. */
             save_username($pdo, $userId, $form["name"]);
-            header("Location: /settings.php?saved=profile");
+            header("Location: " . app_url("settings.php?saved=profile"));
             exit;
         }
         /* Failure re-renders below with $form["name"] kept in the input. */
@@ -117,14 +117,14 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
            checked. Default keeps the user's custom categories (§14). */
         clear_records_and_balance($pdo, $userId, isset($_POST["clear_categories"]));
         reset_record_counters($pdo);
-        header("Location: /settings.php?saved=cleared");
+        header("Location: " . app_url("settings.php?saved=cleared"));
         exit;
     }
     elseif($action === "reset"){
         factory_reset_user($pdo, $userId);
         reset_record_counters($pdo);
         /* The first-visit gate is open again — land on the prompt. */
-        header("Location: /");
+        header("Location: " . app_url());
         exit;
     }
     else{
@@ -165,7 +165,7 @@ require_once("./partials/sidebar.php");
     <section class="card mb-4">
         <div class="card-body">
             <h2 class="h5 mb-3">Profile</h2>
-            <form method="post" action="/settings.php" novalidate>
+            <form method="post" action="<?= htmlspecialchars(app_url("settings.php")) ?>" novalidate>
                 <input type="hidden" name="action" value="profile">
                 <div class="mb-3">
                     <label class="form-label" for="settingsName">Name</label>
@@ -366,7 +366,7 @@ require_once("./partials/sidebar.php");
                     <h2 class="modal-title h5" id="clearModalLabel">Clear Data &amp; Reset Balance</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="post" action="/settings.php">
+                <form method="post" action="<?= htmlspecialchars(app_url("settings.php")) ?>">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="clear">
                         <p class="mb-3">
@@ -431,7 +431,7 @@ require_once("./partials/sidebar.php");
                     <p class="mb-0">You will be asked for a new name again after this action.</p>
                 </div>
                 <div class="modal-footer">
-                    <form method="post" action="/settings.php">
+                    <form method="post" action="<?= htmlspecialchars(app_url("settings.php")) ?>">
                         <input type="hidden" name="action" value="reset">
                         <button type="submit" class="btn btn-outline-danger">Delete Account</button>
                     </form>
@@ -666,7 +666,7 @@ require_once("./partials/sidebar.php");
             payload.append("action", "save_types");
             payload.append("types", JSON.stringify(types));
 
-            fetch("/categories.php", { method: "POST", body: payload })
+            fetch(<?= json_encode(app_url("categories.php")) ?>, { method: "POST", body: payload })
                 .then(function(response){
                     return response.json().then(function(data){
                         return { status: response.status, data: data };
@@ -771,7 +771,7 @@ require_once("./partials/sidebar.php");
         });
 
         var postCategoryAction = function(payload){
-            return fetch("/categories.php", { method: "POST", body: payload })
+            return fetch(<?= json_encode(app_url("categories.php")) ?>, { method: "POST", body: payload })
                 .then(function(response){
                     return response.json().then(function(data){
                         return data;
@@ -939,7 +939,7 @@ require_once("./partials/sidebar.php");
             payload.append("name", name);
             payload.append("type", typeSelect.value);
 
-            fetch("/categories.php", { method: "POST", body: payload })
+            fetch(<?= json_encode(app_url("categories.php")) ?>, { method: "POST", body: payload })
                 .then(function(response){
                     return response.json().then(function(data){
                         return { status: response.status, data: data };

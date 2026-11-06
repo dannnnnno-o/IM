@@ -1,4 +1,4 @@
-<script src="/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="<?= htmlspecialchars(app_url("vendor/bootstrap/bootstrap.bundle.min.js")) ?>"></script>
 <script>
 /* Double-submit guard. Document-level and bubble-phase, so it runs after any
    form-level handler; a page that cancelled the submit (index.php's confirm

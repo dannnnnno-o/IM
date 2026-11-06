@@ -10,10 +10,10 @@ catch(PDOException $e){
 $user = get_user($pdo, 1);
 
 /* First-visit gate (docs §6): while users.username is empty/blank this route
-   IS the landing page. Once a name is stored, "/" keeps the pre-landing
+   IS the landing page. Once a name is stored, "/im/" keeps the pre-landing
    behavior — a 302 straight to the dashboard. */
 if(!username_is_missing($user)){
-    header("Location: /dashboard.php");
+    header("Location: " . app_url("dashboard.php"));
     exit;
 }
 
@@ -32,7 +32,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
     else{
         // First visit complete: store the name, then straight to the app.
         save_username($pdo, 1, $name);
-        header("Location: /dashboard.php?registered=true");
+        header("Location: " . app_url("dashboard.php?registered=true"));
         exit;
     }
 }
@@ -69,7 +69,7 @@ require_once("./partials/header.php");
                 </div>
             <?php endif; ?>
 
-            <form method="post" action="/" novalidate>
+            <form method="post" action="<?= htmlspecialchars(app_url()) ?>" novalidate>
                 <div class="mb-3">
                     <label class="form-label" for="name">Your name</label>
                     <div class="landing-input-wrap">

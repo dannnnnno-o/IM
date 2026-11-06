@@ -94,7 +94,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
     if(empty($errors) && $amount !== null){
         $comment = $form["comment"] !== "" ? $form["comment"] : null;
         create_transaction($pdo, $mode, $amount, $form["category"], $comment, $userId);
-        header("Location: /dashboard.php?saved=" . ($mode === "+" ? "income" : "expense"));
+        header("Location: " . app_url("dashboard.php?saved=" . ($mode === "+" ? "income" : "expense")));
         exit;
     }
 }
@@ -124,7 +124,7 @@ require_once("./partials/sidebar.php");
                         </div>
                     <?php endif; ?>
 
-                    <form method="post" action="/make-transactions.php" novalidate>
+                    <form method="post" action="<?= htmlspecialchars(app_url("make-transactions.php")) ?>" novalidate>
                         <div class="mb-3">
                             <label class="form-label" for="mode">Transaction Mode</label>
                             <select class="form-select" id="mode" name="mode">
@@ -202,7 +202,7 @@ require_once("./partials/sidebar.php");
                             <div class="form-text">Controls which transaction modes can use this category.</div>
                         </div>
                         <div id="addCategoryError" class="alert alert-danger py-2 mb-0 d-none" role="alert"></div>
-                        <a href="/settings.php#manage-categories" class="btn-add-category text-decoration-none">Manage Categories</a>
+                        <a href="<?= htmlspecialchars(app_url("settings.php#manage-categories")) ?>" class="btn-add-category text-decoration-none">Manage Categories</a>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -315,7 +315,7 @@ require_once("./partials/sidebar.php");
                 payload.append("type", newTypeSelect.value);
             }
 
-            fetch("/categories.php", { method: "POST", body: payload })
+            fetch(<?= json_encode(app_url("categories.php")) ?>, { method: "POST", body: payload })
                 .then(function(response){
                     return response.json().then(function(data){
                         return { status: response.status, data: data };

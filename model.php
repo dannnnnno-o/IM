@@ -1,4 +1,10 @@
 <?php 
+const APP_BASE_PATH = "/im";
+
+function app_url(string $path = ""){
+    return APP_BASE_PATH . "/" . ltrim($path, "/");
+}
+
 const PREDEFINED_CATEGORIES = [
     "Food",
     "Groceries",

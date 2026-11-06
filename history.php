@@ -61,11 +61,11 @@ $historyBase = array_filter(array_merge($period["state"], ["type" => $typeInput]
 
 function history_url(array $overrides, array $base){
     $query = array_merge($base, $overrides);
-    return "/history.php?" . http_build_query($query);
+    return app_url("history.php") . "?" . http_build_query($query);
 }
 
 $periodConfig = [
-    "action" => "/history.php",
+    "action" => app_url("history.php"),
     "allowAllTime" => true,
     "allTimeActive" => $period["view"] === "all",
     "extraHidden" => ["type" => $typeInput],
@@ -89,7 +89,7 @@ require_once("./partials/sidebar.php");
             <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                 <?php require_once("./partials/period-picker.php"); ?>
 
-                <form method="get" action="/history.php" id="typeForm" class="d-flex align-items-center gap-2">
+                <form method="get" action="<?= htmlspecialchars(app_url("history.php")) ?>" id="typeForm" class="d-flex align-items-center gap-2">
                     <input type="hidden" name="view" value="<?= htmlspecialchars($period["state"]["view"]) ?>">
                     <?php foreach(array_filter(array_diff_key($period["state"], ["view" => true])) as $stateName => $stateValue): ?>
                         <input type="hidden" name="<?= htmlspecialchars($stateName) ?>" value="<?= htmlspecialchars($stateValue) ?>">

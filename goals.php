@@ -129,7 +129,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
                 create_goal($pdo, $form["name"], $targetAmount, $form["target_date"]);
             }
 
-            header("Location: /goals.php?saved=goal");
+            header("Location: " . app_url("goals.php?saved=goal"));
             exit;
         }
 
@@ -151,7 +151,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
         }
         else{
             delete_goal($pdo, (int) $postedId);
-            header("Location: /goals.php?saved=deleted");
+            header("Location: " . app_url("goals.php?saved=deleted"));
             exit;
         }
     }
@@ -167,7 +167,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
         }
         else{
             mark_goal_complete($pdo, (int) $postedId);
-            header("Location: /goals.php?saved=completed");
+            header("Location: " . app_url("goals.php?saved=completed"));
             exit;
         }
     }
@@ -218,7 +218,7 @@ if($_SERVER["REQUEST_METHOD"] === "POST"){
                     $action === "invest" ? "-" : "+"
                 );
 
-                header("Location: /goals.php?saved=" . ($action === "invest" ? "invested" : "taken"));
+                header("Location: " . app_url("goals.php?saved=" . ($action === "invest" ? "invested" : "taken")));
                 exit;
             }
 
@@ -418,7 +418,7 @@ require_once("./partials/sidebar.php");
     <?php endif; ?>
 
     <?php
-        $goalModalAction = "/goals.php";
+        $goalModalAction = app_url("goals.php");
         require_once("./partials/goal-modals.php");
     ?>
 
@@ -430,7 +430,7 @@ require_once("./partials/sidebar.php");
                     <h2 class="modal-title h5" id="investModalLabel"><?= $reopenInvestModal ? "Invest in " . htmlspecialchars($investGoalName) : "Invest" ?></h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="post" action="/goals.php" id="investForm" novalidate>
+                <form method="post" action="<?= htmlspecialchars(app_url("goals.php")) ?>" id="investForm" novalidate>
                     <div class="modal-body">
                         <?php if($reopenInvestModal && !empty($errors)): ?>
                             <div class="alert alert-danger py-2" role="alert">
@@ -469,7 +469,7 @@ require_once("./partials/sidebar.php");
                     <h2 class="modal-title h5" id="takebackModalLabel"><?= $reopenTakeBackModal ? "Take Back from " . htmlspecialchars($takeBackGoalName) : "Take Back" ?></h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="post" action="/goals.php" id="takebackForm" novalidate>
+                <form method="post" action="<?= htmlspecialchars(app_url("goals.php")) ?>" id="takebackForm" novalidate>
                     <div class="modal-body">
                         <?php if($reopenTakeBackModal && !empty($errors)): ?>
                             <div class="alert alert-danger py-2" role="alert">
@@ -512,7 +512,7 @@ require_once("./partials/sidebar.php");
                     <p class="mb-0">Are you sure you want to mark <strong id="completeGoalName"></strong> as complete?</p>
                 </div>
                 <div class="modal-footer">
-                    <form method="post" action="/goals.php">
+                    <form method="post" action="<?= htmlspecialchars(app_url("goals.php")) ?>">
                         <input type="hidden" name="action" value="complete">
                         <input type="hidden" name="goal_id" id="completeGoalId" value="">
                         <button type="submit" class="btn btn-primary">Confirm</button>
@@ -601,4 +601,3 @@ require_once("./partials/sidebar.php");
 </main>
 
 <?php require_once("./partials/footer.php"); ?>
-

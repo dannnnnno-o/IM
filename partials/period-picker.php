@@ -3,7 +3,7 @@
    Expects in scope:
      $period        — return of resolve_period() from model.php
      $periodConfig  — [
-         "action"       => form/link target, e.g. "/summary.php",
+         "action"       => form/link target, e.g. app_url("summary.php"),
          "allowAllTime" => bool,
          "allTimeActive"=> bool,
          "extraHidden"  => assoc of hidden inputs each form carries (e.g. type),
